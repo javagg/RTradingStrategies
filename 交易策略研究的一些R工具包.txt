@@ -1,0 +1,25 @@
+
+在R下直接安装的包:
+xts, TTR，quantmod，RTAQ，PerformanceAnalytics，FactorAnalytics, IBrokers
+
+其他手动安装的包：
+1.包：blotter
+安装方法：install.packages("blotter", repos= c("http://R-Forge.R-project.org", getOption("repos")))
+
+2.包：FinancialInstrument 
+安装方法：install.packages("FinancialInstrument", repos= c("http://R-Forge.R-project.org", getOption("repos")))
+
+3.包：quantstrat 
+安装方法：install.packages("quantstrat", repos= c("http://R-Forge.R-project.org", getOption("repos")))
+
+4.包：FactorAnalytics
+安装方法：install.packages("FactorAnalytics", repos= c("http://R-Forge.R-project.org", getOption("repos")))
+
+5.包：highfrequencies
+安装方法：install.packages("highfrequency", repos= c("http://R-Forge.R-project.org", getOption("repos")))
+
+6.包：qmao
+安装方法：install.packages("qmao", repos= c("http://R-Forge.R-project.org", getOption("repos")))
+
+7.包：twsInstrument
+安装方法：install.packages("twsInstrument", repos= c("http://R-Forge.R-project.org", getOption("repos")))
