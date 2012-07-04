@@ -11,6 +11,7 @@ require(FactorAnalytics)
 # try(rm(list=ls(pos=.strategy), pos=.strategy), silent=TRUE)
 # try(rm(list=ls(pos=.instrument), pos=.instrument), silent=TRUE)
 
+
 load(file.path(this.dir, "sample.500ms.rda"))
 
 mktdata <- sample.500ms
@@ -40,6 +41,7 @@ print(ls_stocks())
 
 start.time <- '2011-10-10 10:11:20'
 initial.equity <- 1000000
+
 
 the.signal <- function(HLC) {
   adx <- ADX(HLC)[,"ADX"]
@@ -115,3 +117,12 @@ strat <- add.signal(strat, name="sigCrossover", arguments = list(columns=c("fast
 # updatePortf(Portfolio=portfolio.name, Dates=paste('::', as.Date(Sys.time()), sep=''))
 # 
 # chart.Posn(Portfolio=portfolio.name, Symbol=stock.str)
+
+strategy.obj <- strategy(strategy.name)
+strategy.obj <- add.indicator(strategy = strategy.obj, name = "BBands", arguments=list(HLC=quote(HLC(mktdata)), maType='SMA'))
+
+chartSeries(mktdata, type="bar", yrange=c(2580, 2710), TA=c(addVo(),addBBands()), theme=chartTheme('white'))
+addTA(EMA(Cl(mktdata), n=12), on=1, col="pink")
+addTA(EMA(Cl(mktdata), n=2), on=1, col="blue")
+addRSI()
+
