@@ -41,7 +41,7 @@ print(ls_currencies())
 stock(contract, currency='USD', multiplier=1)
 # print(ls_stocks())
 
-start.time <- '2012-03-14 09:14:59'
+start.time <- '2012-03-14T09:14:59'
 initial.equity <- 1000000
 
 IF2016 <- mkt
@@ -107,7 +107,7 @@ strat <- add.rule(strat, name="ruleSignal", arguments = list(sigcol="market.clos
 
 out <- applyStrategy(strat, portfolios=portfolio.name)
 
-updatePortf(Portfolio=portfolio.name, Dates="2012-03-14T09:14:59::2012-03-14T15:15:00")
+updatePortf(Portfolio=portfolio.name, Dates=paste(start.time, '::', format(Sys.time(), "%Y-%M-%dT%H:%m:%S"), sep=''))
 
 chart.Posn(Portfolio=portfolio.name)
 # plot(add_MACD(fast=fastMA, slow=slowMA, signal=signalMA,maType="EMA"))
