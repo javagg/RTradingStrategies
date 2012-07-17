@@ -242,6 +242,11 @@ slowMA <- 12
 qty <- 100
 txnfee <- -20
 
+begin.date <- "2011-12-31"
+end.date <- Sys.Date()
+start.time <- '2012-03-14T09:14:59'
+
+
 currency('USD')
 print(ls_currencies())
 stock(contract, currency='USD', multiplier=1)
@@ -268,8 +273,8 @@ strat <- add.indicator(strat, label="adx", name='ADX', arguments=list(HLC=quote(
 # signals
 strat <- add.signal(strat, name="sigCrossover", arguments = list(columns=c("fast.EMA", "slow.EMA"), relationship="gte"), label="fast.cross.above.slow")
 strat <- add.signal(strat, name="sigCrossover", arguments = list(columns=c("fast.EMA", "slow.EMA"), relationship="lt"), label="fast.cross.below.slow")
-strat <- add.signal(strat, name="sigThreshold", arguments = list(column="ADX", relationship="gte", threshold=28), label="adx.gte.threshold")
-strat <- add.signal(strat, name="sigThreshold", arguments = list(column="ADX", relationship="lt", threshold=28), label="adx.lt.threshold") 
+# strat <- add.signal(strat, name="sigThreshold", arguments = list(column="ADX", relationship="gte", threshold=28), label="adx.gte.threshold")
+# strat <- add.signal(strat, name="sigThreshold", arguments = list(column="ADX", relationship="lt", threshold=28), label="adx.lt.threshold") 
 
 sigBuyLong <- function(label, data = mktdata) {
   signal <- xts(rep(FALSE, nrow(data)), order.by=index(data))
@@ -314,6 +319,9 @@ strat <- add.rule(strat, name="ruleSignal", arguments = list(sigcol="fast.cross.
 strat <- add.rule(strat, name="ruleSignal", arguments = list(sigcol="market.close", sigval=TRUE, orderqty="all", ordertype='market', orderside='long'), type='risk')
 strat <- add.rule(strat, name="ruleSignal", arguments = list(sigcol="market.close", sigval=TRUE, orderqty="all", ordertype='market', orderside='short'), type='risk')
 
+addPosLimit(portfolio.name, contract, timestamp=initDate, maxpos=qty, minpos=0)
+addPosLimit(portfolio.name, contract, timestamp=initDate, maxpos=qty, minpos=0)
+
 out <- applyStrategy(strat, portfolios=portfolio.name)
 
 # print("updateProf")
@@ -327,8 +335,8 @@ chart.Posn(Portfolio=portfolio.name)
 #look at the order book
 getOrderBook(portfolio.name)
 
-dailyEqPL(portfolio.name)
-dailyTxnPL(portfolio.name)
+dailyEqPL(portfolio.name, drop.time=F)
+dailyTxnPL(portfolio.name, drop.time=F)
 tradeStats(portfolio.name)
 dailyStats(portfolio.name)
 getEndEq(account.name, Date=Sys.time())
