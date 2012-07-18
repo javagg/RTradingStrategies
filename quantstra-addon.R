@@ -1,69 +1,110 @@
-# getSymbols.MySQL <- function (Symbols, env, return.class = "xts", db.fields = c("date", 
-#                                                                                 "o", "h", "l", "c", "v", "a"), field.names = NULL, user = NULL, 
-#                               password = NULL, dbname = NULL, ...) 
-# {
-#   importDefaults("getSymbols.MySQL")
-#   this.env <- environment()
-#   for (var in names(list(...))) {
-#     assign(var, list(...)[[var]], this.env)
-#   }
-#   if (missing(verbose)) 
-#     verbose <- FALSE
-#   if (missing(auto.assign)) 
-#     auto.assign <- TRUE
-#   if ("package:DBI" %in% search() || require("DBI", quietly = TRUE)) {
-#     if ("package:RMySQL" %in% search() || require("RMySQL", 
-#                                                   quietly = TRUE)) {
-#     }
-#     else {
-#       warning(paste("package:", dQuote("RMySQL"), "cannot be loaded"))
-#     }
-#   }
-#   else {
-#     stop(paste("package:", dQuote("DBI"), "cannot be loaded."))
-#   }
-#   if (is.null(user) || is.null(password) || is.null(dbname)) {
-#     stop(paste("At least one connection argument (", sQuote("user"), 
-#                sQuote("password"), sQuote("dbname"), ") is not set"))
-#   }
-#   con <- dbConnect(MySQL(), user = user, password = password, 
-#                    dbname = dbname)
-#   db.Symbols <- dbListTables(con)
-#   print(db.Symbols)
-#   if (length(Symbols) != sum(Symbols %in% db.Symbols)) {
-#     missing.db.symbol <- Symbols[!Symbols %in% db.Symbols]
-#     warning(paste("could not load symbol(s): ", paste(missing.db.symbol, 
-#                                                       collapse = ", ")))
-#     Symbols <- Symbols[Symbols %in% db.Symbols]
-#   }
-#   for (i in 1:length(Symbols)) {
-#      if (verbose) {
-#       cat(paste("Loading ", Symbols[[i]], paste(rep(".", 
-#                                                     10 - nchar(Symbols[[i]])), collapse = ""), sep = ""))
-#     }
-# 
-#     query <- paste("SELECT ", paste(db.fields, collapse = ","), 
-#                    " FROM ", Symbols[[i]], " ORDER BY date")
-#      print(query)
-#     rs <- dbSendQuery(con, query)
-#     fr <- fetch(rs, n = -1)
-#      print("aaaa")
-#     fr <- xts(as.matrix(fr[, -1]), order.by = as.Date(fr[, 
-#                                                          1], origin = "1970-01-01"), src = dbname, updated = Sys.time())
-#    
-#      colnames(fr) <- paste(Symbols[[i]], c("Open", "High", 
-#                                           "Low", "Close", "Volume", "Adjusted"), sep = ".")
-#     fr <- convert.time.series(fr = fr, return.class = return.class)
-#     if (auto.assign) 
-#       assign(Symbols[[i]], fr, env)
-#     if (verbose) 
-#       cat("done\n")
-#   }
-#   dbDisconnect(con)
-#   if (auto.assign) 
-#     return(Symbols)
-#   return(fr)
-# }
+library(quantstrat)
+convert.time.series <- function (fr, return.class) {
+  if ("quantmod.OHLC" %in% return.class) {
+    class(fr) <- c("quantmod.OHLC", "zoo")
+    return(fr)
+  }
+  else if ("xts" %in% return.class) {
+    return(fr)
+  }
+  if ("zoo" %in% return.class) {
+    return(as.zoo(fr))
+  }
+  else if ("ts" %in% return.class) {
+    fr <- as.ts(fr)
+    return(fr)
+  }
+  else if ("data.frame" %in% return.class) {
+    fr <- as.data.frame(fr)
+    return(fr)
+  }
+  else if ("matrix" %in% return.class) {
+    fr <- as.data.frame(fr)
+    return(fr)
+  }
+  else if ("its" %in% return.class) {
+    if ("package:its" %in% search() || suppressMessages(require("its", 
+                                                                quietly = TRUE))) {
+      fr.dates <- as.POSIXct(as.character(index(fr)))
+      fr <- its::its(coredata(fr), fr.dates)
+      return(fr)
+    }
+    else {
+      warning(paste("'its' from package 'its' could not be loaded:", 
+                    " 'xts' class returned"))
+    }
+  }
+  else if ("timeSeries" %in% return.class) {
+    if ("package:timeSeries" %in% search() || suppressMessages(require("timeSeries", 
+                                                                       quietly = TRUE))) {
+      fr <- timeSeries(coredata(fr), charvec = as.character(index(fr)))
+      return(fr)
+    }
+    else {
+      warning(paste("'timeSeries' from package 'timeSeries' could not be loaded:", 
+                    " 'xts' class returned"))
+    }
+  }
+}
+
+getSymbols.mysql <- function (Symbols, env, return.class = "xts", db.fields = c("date", "o", "h", "l", "c", "v", "a"), 
+    field.names = NULL, user = NULL, password = NULL, dbname = NULL, ...) {
+  
+  importDefaults("getSymbols.MySQL")
+  this.env <- environment()
+  for (var in names(list(...))) {
+    assign(var, list(...)[[var]], this.env)
+  }
+  if (missing(verbose)) 
+    verbose <- FALSE
+  if (missing(auto.assign)) 
+    auto.assign <- TRUE
+  if ("package:DBI" %in% search() || require("DBI", quietly = TRUE)) {
+    if ("package:RMySQL" %in% search() || require("RMySQL", quietly = TRUE)) {
+    }
+    else {
+      warning(paste("package:", dQuote("RMySQL"), "cannot be loaded"))
+    }
+  } else {
+    stop(paste("package:", dQuote("DBI"), "cannot be loaded."))
+  }
+  if (is.null(user) || is.null(password) || is.null(dbname)) {
+    stop(paste("At least one connection argument (", sQuote("user"), 
+               sQuote("password"), sQuote("dbname"), ") is not set"))
+  }
+  con <- dbConnect(MySQL(), user = user, password = password, dbname = dbname)
+  db.Symbols <- dbListTables(con)
+  if (length(Symbols) != sum(Symbols %in% db.Symbols)) {
+    missing.db.symbol <- Symbols[!Symbols %in% db.Symbols]
+    warning(paste("could not load symbol(s): ", paste(missing.db.symbol, collapse = ", ")))
+    Symbols <- Symbols[Symbols %in% db.Symbols]
+  }
+  for (i in 1:length(Symbols)) {
+    if (verbose) {
+      cat(paste("Loading ", Symbols[[i]], paste(rep(".", 10 - nchar(Symbols[[i]])), collapse = ""), sep = ""))
+    }
+    
+    query <- paste("SELECT ", paste(db.fields, collapse = ","), " FROM ", Symbols[[i]], " ORDER BY date")
+    rs <- dbSendQuery(con, query)
+    fr <- fetch(rs, n = -1)
+    fr <- xts(as.matrix(fr[, -1]), order.by = as.POSIXct(fr[, 1], origin = "1970-01-01"), src = dbname, updated = Sys.time())
+    #colnames(fr) <- paste(Symbols[[i]], c("Open", "High", "Low", "Close", "Volume", "Adjusted"), sep = ".")
+    colnames(fr) <- field.names
+    
+    fr <- convert.time.series(fr = fr, return.class = return.class)
+    if (auto.assign) 
+      assign(Symbols[[i]], fr, env)
+    if (verbose) 
+      cat("done\n")
+  }
+  dbDisconnect(con)
+  if (auto.assign) 
+    return(Symbols)
+  return(fr)
+}
+
+# assignInNamespace("getSymbols.MySQL", getSymbols.MySQL, ns="quantmod")
+# rm(getSymbols.MySQL)
 
 # These functions should be included into the 'xts' package
 to.seconds <- function(x, k, name, ...) {
@@ -168,7 +209,7 @@ getSymbols.myfile <- function(Symbols, env) {
       format <- ""    
     if (verbose) 
       cat("loading ", Symbols[[i]], ".....")
-
+    
     fr <- read.csv(sym.file)
     if (verbose) 
       cat("done.\n")
@@ -187,4 +228,13 @@ getSymbols.myfile <- function(Symbols, env) {
   return(fr)
 }
 
-getSymbols("IF1206", src="mysql", verbose=F, user="root", password="", dbname="stockdata", db.fields=c("date", "open", "high", "low", "close", "volume", "adjusted"))
+# example
+# getSymbols.MySQL <- getSymbols.mysql
+# db.fields <- c("date", "open", "high", "low", "close", "bid", "ask", "volume", "adjusted")
+# field.names <- db.fields[-1]
+# IF1207 <- getSymbols.MySQL("IF1207", verbose=F, auto.assign=F, user="test", password="123456", dbname="stockdata", host="192.168.10.5", db.fields=db.fields, field.names=field.names)
+# 
+# IF1207<-IF1207["T09:14/T15:15"]
+# IF1207 <- IF1207[, c("high", "low", "close", "bid","ask","volume")]
+# IF1207 <- to.minutes(IF1207)
+# save(IF1207, file="IF1207.rda")

@@ -26,11 +26,7 @@ xts, TTR，quantmod，RTAQ，PerformanceAnalytics，FactorAnalytics, IBrokers
 
 
 主要包更新
-install.packages("quantmod", repos= c("http://R-Forge.R-project.org", getOption("repos")))
-install.packages("FinancialInstrument", repos= c("http://R-Forge.R-project.org", getOption("repos")))
-install.packages("blotter", repos= c("http://R-Forge.R-project.org", getOption("repos")))
-install.packages("quantstrat", repos= c("http://R-Forge.R-project.org", getOption("repos")))
-install.packages("qmao", repos= c("http://R-Forge.R-project.org", getOption("repos")))
+install.packages(c("FinancialInstrument", "quantmod", "blotter", "quantstrat", "qmao"), repos= c("http://R-Forge.R-project.org", getOption("repos")))
 
 一些例子：
 The Aleph Blog momentum bucket strategy
