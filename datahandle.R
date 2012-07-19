@@ -6,7 +6,6 @@ files <- list.files(data.dir, full.names=T)
 # print(files)
 symbols <- paste("IF120", as.character(1:6), sep="")
 
-
 for (symbol in symbols) {
   fs <- grep(symbol, files, value=T)
   colnums <- c(5, 6, 7, 8, 10, 11, 9)
