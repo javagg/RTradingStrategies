@@ -136,7 +136,7 @@ strat <- add.rule(strat, label='trailingexit', name="ruleSignal", arguments = li
 out <- applyStrategy(strat, portfolios=portfolio.name)
 updatePortf(Portfolio=portfolio.name, Dates="2011/2012")
 chart.Posn(Portfolio=portfolio.name)
- 
+
 p <- getPortfolio(portfolio.name)
 s <- p$symbols[[contract]]
 mkt <- get(contract)
