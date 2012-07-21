@@ -35,7 +35,8 @@ stratMACROSS <- add.signal(strategy = stratMACROSS,name="sigCrossover",arguments
 stratMACROSS <- add.rule(strategy = stratMACROSS, name='ruleSignal', arguments = list(sigcol="ma50.gt.ma200",sigval=TRUE, orderqty=100, ordertype='market', orderside='long'),type='enter')
 stratMACROSS <- add.rule(strategy = stratMACROSS, label="signalexit", name='ruleSignal', arguments = list(sigcol="ma50.lt.ma200",sigval=TRUE, orderqty="all", ordertype='market', orderside='long', orderset="exit2"),type='exit')
 # take-profit exit
-# stratMACROSS <- add.rule(strategy = stratMACROSS, label="takeprofitexit", name='ruleSignal', arguments = list(sigcol="ma50.gt.ma200", sigval=TRUE, orderqty="all", ordertype='limit', orderside='long', threshold=+1, tmult=F, orderset="altexit1"),type='exit')
+
+#stratMACROSS <- add.rule(strategy = stratMACROSS, label="takeprofitexit", name='ruleSignal', arguments = list(sigcol="ma50.gt.ma200", sigval=TRUE, orderqty="all", ordertype='limit', orderside='long', threshold=+1, tmult=F, orderset="altexit1"),type='exit')
 # stop-loss exit
 #stratMACROSS <- add.rule(strategy = stratMACROSS, label="stoplossexit", name='ruleSignal', arguments = list(sigcol="ma50.gt.ma200",sigval=TRUE, orderqty="all", ordertype='stoplimit', orderside='long', threshold=-2,tmult=F, orderset="altexit"),type='exit')
 
@@ -51,8 +52,8 @@ getSymbols(stock.str,from=initDate)
 for(i in stock.str)
   assign(i, adjustOHLC(get(i),use.Adjusted=TRUE))
 
-start_t<-Sys.time()
-out<-try(applyStrategy(strategy=stratMACROSS , portfolios=portfolio.st))
+start_t <- Sys.time()
+out <- try(applyStrategy(strategy=stratMACROSS , portfolios=portfolio.st))
 end_t<-Sys.time()
 print(end_t-start_t)
 
@@ -68,16 +69,3 @@ plot(add_SMA(n=200, on=1))
 
 ob <- getOrderBook('macross')
 # print(ob)
-###############################################################################
-# R (http://r-project.org/) Quantitative Strategy Model Framework
-#
-# Copyright (c) 2009-2010
-# Peter Carl, Dirk Eddelbuettel, Brian G. Peterson,
-# Jeffrey Ryan, Joshua Ulrich, and Garrett See
-#
-# This library is distributed under the terms of the GNU Public License (GPL)
-# for full details see the file COPYING
-#
-# $Id: maCross.R 639 2011-06-24 14:29:06Z gsee $
-#
-###############################################################################
