@@ -41,7 +41,7 @@ stratMACROSS <- add.rule(strategy = stratMACROSS, label="signalexit", name='rule
 #stratMACROSS <- add.rule(strategy = stratMACROSS, label="stoplossexit", name='ruleSignal', arguments = list(sigcol="ma50.gt.ma200",sigval=TRUE, orderqty="all", ordertype='stoplimit', orderside='long', threshold=-2,tmult=F, orderset="altexit"),type='exit')
 
 # trailing stop exit
-stratMACROSS <- add.rule(strategy = stratMACROSS, label="stoptrailingexit", name='ruleSignal', arguments = list(sigcol="ma50.gt.ma200",sigval=TRUE, orderqty=-100, ordertype='stoptrailing', orderside='long', threshold=-1,tmult=F, orderset="altexit"), type='risk')
+stratMACROSS <- add.rule(strategy = stratMACROSS, label="stoptrailingexit", name='ruleSignal', arguments = list(sigcol="ma50.gt.ma200",sigval=TRUE, orderqty="all", ordertype='stoptrailing', orderside='long', threshold=-2.5,tmult=F, orderset="altexit"), type='exit')
 
 # if you want a long/short Stops and Reverse MA cross strategy, you'd add two more rules for the short side:
 
@@ -68,4 +68,4 @@ plot(add_SMA(n=50 , on=1,col='blue'))
 plot(add_SMA(n=200, on=1))
 
 ob <- getOrderBook('macross')
-# print(ob)
+print(ob)
