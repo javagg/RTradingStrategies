@@ -1,11 +1,11 @@
 current.dir <- dirname(parent.frame(2)$ofile)
 source(file.path(current.dir, "quantstrat-addon.R"))
+source(file.path(current.dir, "quantstrat-myrule.R"))
 
 require(quantstrat)
 require(qmao)
 require(PerformanceAnalytics)
 options(width=240)
-## example
 
 # db.fields <- c("date", "open", "high", "low", "close", "bid", "ask", "volume", "adjusted")
 # field.names <- db.fields[-1]
@@ -27,33 +27,47 @@ try(rm(list=ls(pos=.blotter), pos=.blotter), silent=T)
 try(rm(list=ls(pos=.strategy), pos=.strategy), silent=T)
 try(rm(list=ls(pos=.instrument), pos=.instrument), silent=T)
 
-contract <- 'IF1206'
+contract <- 'IF1208'
 portfolio.name <- strategy.name
 account.name <- strategy.name
 
+###############################################################################
+# Parameters
+###############################################################################
 fastEMA <- 2 
 slowEMA <- 16
 adx.min <- 12
 adx.max <- 58
+stoploss.threshold <- 0.4
+stoptrailing.threshold <- 0.2
+qty <- 1
+txnfee <- -0.15/2
+enter.timespan <- "T09:15/T14:58"
 
-qty <- 2
-txnfee <- -.02
-
-begin.date <- "2011-12-31"
+begin.date <- "2012-07-24"
 end.date <- Sys.Date()
-start.time <- '2012-05-21T10:14:59'
+start.time <- '2012-07-24T09:14:59'
+# start.time <- format(index(first(contract.data)), format="%Y-%m-%dT%H:%M:%S")
+initial.equity <- 1000000
 
-currency('USD')
-print(ls_currencies())
-stock(contract, currency='USD', multiplier=1)
-# print(ls_stocks())
+
+
+stoploss.threshold <- function() {
+  
+}
+
+stoptrailing.threshold <-  function() {
+  
+}
+
+# currency('USD')
+currency('RMB')
+# print(ls_currencies())
+future(contract, currency='RMB', multiplier=300)
+# print(ls_futures())
 
 # getData
 contract.data <- get(contract)
-
-start.time <- '2012-07-17T09:14:59' 
-start.time <- format(index(first(contract.data)), format="%Y-%m-%dT%H:%M:%S")
-initial.equity <- 1000000
 
 initPortf(portfolio.name, symbols=contract, initDate=start.time)
 initAcct(account.name, portfolios=portfolio.name, initDate=start.time)
@@ -73,8 +87,6 @@ strat <- add.indicator(strat, label="adx", name='ADX', arguments=list(HLC=quote(
 # signals
 strat <- add.signal(strat, name="sigCrossover", arguments = list(columns=c("fast.EMA", "slow.EMA"), relationship="gte"), label="fast.cross.above.slow")
 strat <- add.signal(strat, name="sigCrossover", arguments = list(columns=c("fast.EMA", "slow.EMA"), relationship="lt"), label="fast.cross.below.slow")
-# strat <- add.signal(strat, name="sigThreshold", arguments = list(column="ADX", relationship="gte", threshold=28), label="adx.gte.threshold")
-# strat <- add.signal(strat, name="sigThreshold", arguments = list(column="ADX", relationship="lt", threshold=28), label="adx.lt.threshold") 
 
 sigRange <- function(label, data=mktdata, column, upper, lower) {
   xx <- data[, column]
@@ -121,20 +133,19 @@ strat <- add.signal(strat, name="sigMarketClose", arguments = list(data=quote(mk
 # buy long
 strat <- add.rule(strat, name="ruleSignal", arguments = list(sigcol="buy.long", sigval=TRUE, orderqty=qty, ordertype='market', orderside='long', pricemethod='market', replace=FALSE, TxnFees=txnfee), type='enter', path.dep=TRUE)
 strat <- add.rule(strat, label='signalexit',name="ruleSignal", arguments = list(sigcol="fast.cross.below.slow", sigval=TRUE, orderqty="all", ordertype='market', orderside='long', pricemethod='market', replace=FALSE, TxnFees=txnfee, orderset="exit2"), type='exit', path.dep=TRUE)
-strat <- add.rule(strat, label='trailingexit', name="ruleSignal", arguments = list(sigcol="buy.long", sigval=TRUE, orderqty=-qty, ordertype='stoptrailing', orderside='long', threshold=0.95, tmult=T, TxnFees=txnfee, orderset="exit2"), type='risk')
+#strat <- add.rule(strat, label='trailingexit', name="ruleSignal", arguments = list(sigcol="buy.long", sigval=TRUE, orderqty=-qty, ordertype='stoptrailing', orderside='long', threshold=-0.5, tmult=T, TxnFees=txnfee, orderset="exit2"), type='risk')
 
 # sell short
-# strat <- add.rule(strat, name="ruleSignal", arguments = list(sigcol="sell.short", sigval=TRUE, orderqty=-qty, ordertype='market', orderside='short', pricemethod='market', replace=FALSE, TxnFees=txnfee), type='enter', path.dep=TRUE)
-# strat <- add.rule(strat, name="ruleSignal", arguments = list(sigcol="fast.cross.above.slow", sigval=TRUE, orderqty="all", ordertype='market', orderside='short', pricemethod='market', replace=FALSE, TxnFees=txnfee), type='exit', path.dep=TRUE)
+strat <- add.rule(strat, name="ruleSignal", arguments = list(sigcol="sell.short", sigval=TRUE, orderqty=-qty, ordertype='market', orderside='short', pricemethod='market', replace=FALSE, TxnFees=txnfee), type='enter', path.dep=TRUE)
+strat <- add.rule(strat, name="ruleSignal", arguments = list(sigcol="fast.cross.above.slow", sigval=TRUE, orderqty="all", ordertype='market', orderside='short', pricemethod='market', replace=FALSE, TxnFees=txnfee), type='exit', path.dep=TRUE)
 
-# strat <- add.rule(strat, name="ruleSignal", arguments = list(sigcol="market.close", sigval=TRUE, orderqty="all", ordertype='market', orderside='long'), type='risk')
+strat <- add.rule(strat, name="ruleSignal", arguments = list(sigcol="market.close", sigval=TRUE, orderqty="all", ordertype='market', orderside='long'), type='risk')
 # strat <- add.rule(strat, name="ruleSignal", arguments = list(sigcol="market.close", sigval=TRUE, orderqty="all", ordertype='market', orderside='short'), type='risk')
 
-# addPosLimit(portfolio.name, contract, timestamp=start.time, maxpos=qty, minpos=0)
-# addPosLimit(portfolio.name, contract, timestamp=start.time, maxpos=qty, minpos=0)
+addPosLimit(portfolio.name, contract, timestamp=start.time, maxpos=qty, minpos=0)
 
 out <- applyStrategy(strat, portfolios=portfolio.name)
-updatePortf(Portfolio=portfolio.name, Dates="2011/2012")
+updatePortf(Portfolio=portfolio.name)
 chart.Posn(Portfolio=portfolio.name)
 
 p <- getPortfolio(portfolio.name)
@@ -151,7 +162,7 @@ plot(add_TA(xts(rep(adx.max, nrow(mkt)), order.by=index(mkt)), on=5, col="red"))
 # #look at the order book
 book <- getOrderBook(portfolio.name)
 book <- book[[strategy.name]][[contract]]
-print(book)
+#print(book)
 dailyEqPL(portfolio.name, drop.time=F)
 dailyTxnPL(portfolio.name, drop.time=F)
 tradeStats(portfolio.name)

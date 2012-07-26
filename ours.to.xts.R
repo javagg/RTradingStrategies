@@ -1,5 +1,5 @@
 this.dir <- dirname(parent.frame(2)$ofile)
-raw <- read.table(file.path(this.dir, "IF1203_20120314.txt"))
+raw <- read.table(file.path(this.dir, "IF1208_20120724.txt"))
 
 dt <- paste(format(as.POSIXct(as.character(raw[,"V2"]), format="%Y%M%d"), format="%Y-%M-%d"), raw[,"V3"])
 dt <- paste(dt, raw[,"V4"], sep=".")

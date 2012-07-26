@@ -1,507 +1,3 @@
-# applyRules <- function (portfolio, symbol, strategy, mktdata, Dates = NULL, indicators = NULL, signals = NULL, parameters = NULL, ..., path.dep = TRUE, rule.order = NULL) 
-# {
-#   .Data <- new.env()
-#   get.dindex <- function() get("dindex", pos = .Data)
-#   assign.dindex <- function(dindex) {
-#     dindex <- sort(unique(dindex))
-#     assign("dindex", dindex, .Data)
-#   }
-#   
-#   if (!is.strategy(strategy)) {
-#     strategy <- try(getStrategy(strategy))
-#     if (inherits(strategy, "try-error")) 
-#       stop("You must supply an object of type 'strategy'.")
-#   }
-#   
-#   ret <- NULL
-#   nargs <- list(...)
-#   if (length(nargs) == 0) 
-#     nargs = NULL
-#   if (length("...") == 0 | is.null("...")) {
-#     rm("...")
-#     nargs = NULL
-#   }
-#   
-#   Dates = unique(index(mktdata))
-#   
-#   ruleProc <- function(ruletypelist, timestamp = NULL, path.dep, ruletype, ...) {
-#     for (rule in ruletypelist) {
-#       if (!rule$path.dep == path.dep) 
-#         next()
-#       if (!is.function(rule$name)) {
-#         if (!is.function(get(rule$name))) {
-#           if (!is.function(get(paste("sig", rule$name, sep = ".")))) {
-#             message(paste("Skipping rule", rule$name, "because there is no function by that name to call"))
-#             next()
-#           }
-#           else {
-#             rule$name <- paste("sig", rule$name, sep = ".")
-#           }
-#         }
-#       }
-#       if (!isTRUE(rule$enabled)) 
-#         next()
-#       if (!is.null(rule$timespan) && nrow(mktdata[rule$timespan][timestamp]) == 0) 
-#         next()
-#       if (is.function(rule$name)) 
-#         fun <- rule$name
-#       else fun <- match.fun(rule$name)
-#       
-#       nargs <- list(...)
-#       if (length(nargs) == 0) 
-#         nargs = NULL
-#       if (length("...") == 0 | is.null("...")) {
-#         rm("...")
-#         nargs = NULL
-#       }
-#       .formals <- formals(fun)
-#       onames <- names(.formals)
-#       rule$arguments$timestamp = timestamp
-#       rule$arguments$ruletype = ruletype
-#       rule$arguments$label = rule$label
-#       pm <- pmatch(names(rule$arguments), onames, nomatch = 0L)
-#       names(rule$arguments[pm > 0L]) <- onames[pm]
-#       .formals[pm] <- rule$arguments[pm > 0L]
-#       if (length(parameters)) {
-#         pm <- pmatch(names(parameters), onames, nomatch = 0L)
-#         names(parameters[pm > 0L]) <- onames[pm]
-#         .formals[pm] <- parameters[pm > 0L]
-#       }
-#       if (length(nargs)) {
-#         pm <- pmatch(names(nargs), onames, nomatch = 0L)
-#         names(nargs[pm > 0L]) <- onames[pm]
-#         .formals[pm] <- nargs[pm > 0L]
-#       }
-#       .formals$... <- NULL
-#       if (!is.null(rule$arguments$prefer)) 
-#         .formals$prefer = rule$arguments$prefer
-#       tmp_val <- do.call(fun, .formals)
-#       mktdata <<- mktdata
-#       ret <<- ret
-#       hold <<- hold
-#       holdtill <<- holdtill
-#     } # for
-#   }
-#   
-#   if (isTRUE(path.dep)) {
-#     dindex <- c(1, length(Dates))
-#     assign.dindex(dindex)
-#     for (type in names(strategy$rules)) {
-#       if (length(strategy$rules[[type]]) >= 1) {
-#         for (rule in strategy$rules[[type]]) {
-#           if (isTRUE(rule$path.dep)) {
-#             if (is.null(rule$arguments$sigcol) | is.null(rule$arguments$sigval)) {
-#               assign.dindex(1:length(Dates))
-#             } else {
-#               if (is.null(rule$timespan)) {
-#                 assign.dindex(c(get.dindex(), which(mktdata[, rule$arguments$sigcol] == rule$arguments$sigval)))
-#               } else {
-#                 assign.dindex(c(get.dindex(), which(merge(.xts(, .index(mktdata)), mktdata[rule$timespan, rule$arguments$sigcol]) == rule$arguments$sigval)))
-#               }
-#             }
-#           }
-#         } # for each rule
-#       }
-#     } # for each type
-#     
-#     dindex <- get.dindex()
-#     if (length(dindex) == 0) 
-#       dindex = 1
-#   } else {
-#     Dates = ""
-#     dindex = 1
-#   }
-#   
-#   nextIndex <- function(curIndex, ...) {
-#     if (!isTRUE(path.dep)) {
-#       curIndex = FALSE
-#       return(curIndex)
-#     }
-# 
-#     dindex <- get.dindex()
-#     hasmktord <- FALSE
-#     nidx = FALSE
-#     neworders = NULL
-#     orderbook <- getOrderBook(portfolio)
-#     ordersubset <- orderbook[[portfolio]][[symbol]]
-#     oo.idx <- getOrders(portfolio = portfolio, symbol = symbol, status = "open", which.i = TRUE)
-#     if (length(oo.idx) == 0) {
-#       nidx = FALSE
-#     } else {
-#       isOHLCmktdata <- is.OHLC(mktdata)
-#       isBBOmktdata <- is.BBO(mktdata)
-#       timespan <- paste(timestamp, "::", sep = "")
-#       if (nrow(ordersubset[oo.idx, ][timespan]) == 0) {
-#         nidx = FALSE
-#       } else {
-#         if (!length(grep("market", ordersubset[oo.idx, "Order.Type"])) == 0) {
-#           if (is.na(curIndex) || (curIndex + 1) > length(index(mktdata))) {
-#             curIndex = FALSE
-#           }
-#           hasmktord <- TRUE
-#         }
-#         
-#         if (!length(grep("limit", ordersubset[oo.idx, "Order.Type"])) == 0) {
-#           stoplimitorders <- grep("stoplimit", ordersubset[oo.idx, "Order.Type"])
-#           limitorders <- grep("limit", ordersubset[oo.idx, "Order.Type"])
-#           
-#           #limitorders <- limitorders[-stoplimitorders]
-#           
-#           # stoplimitorders
-#           for (slorder in stoplimitorders) {
-#             print("handle stoplimitorders!")
-#             dindex <- get.dindex()
-#             tmpqty <- ordersubset[oo.idx[slorder], "Order.Qty"]
-#             if (tmpqty == "all") {
-#               tmpqty = 0
-#             }
-#             if (tmpqty == 0) {
-#               side <- ordersubset[oo.idx[slorder], "Order.Side"]
-#               if (side == "long") 
-#                 tmpqty = -1
-#               else tmpqty = 1
-#             }
-#             tmpqty <- as.numeric(tmpqty)
-#             tmpprice <- as.numeric(ordersubset[oo.idx[slorder], "Order.Price"])
-#             
-#             if (tmpqty > 0) {
-#               relationship = "gte"
-#               if (isBBOmktdata) {
-#                 col <- first(colnames(mktdata)[has.Ask(mktdata, which = TRUE)])
-#               }
-#               else if (isOHLCmktdata) {
-#                 col <- first(colnames(mktdata)[has.Hi(mktdata, which = TRUE)])
-#               }
-#               else {
-#                 col <- first(colnames(mktdata)[grep(prefer, colnames(mktdata))])
-#               }
-#               if (is.na(col)) 
-#                 stop("no price discernable for stoplimit in applyRules")
-#             } else {   
-#               relationship = "lte"
-#               if (isBBOmktdata) {
-#                 col <- first(colnames(mktdata)[has.Bid(mktdata, which = TRUE)])
-#               }
-#               else if (isOHLCmktdata) {
-#                 col <- first(colnames(mktdata)[has.Lo(mktdata, which = TRUE)])
-#               }
-#               else {
-#                 col <- first(colnames(mktdata)[grep(prefer, colnames(mktdata))])
-#               }
-#               if (is.na(col)) 
-#                 stop("no price discernable for stoplimit in applyRules")
-#             }
-#             
-#             # Find dindexes that order can be filled
-#             cross <- sigThreshold(label = "tmpstop", column = col, threshold = tmpprice, relationship = relationship)
-#             if (any(cross[timespan])) {
-#               newidx <- curIndex + which(cross[timespan])[1] - 1
-#               assign.dindex(c(get.dindex(), newidx))
-#             }
-#           }
-#           
-#           # limitorders
-#           for (lorder in limitorders) {
-#             print("handle limitorders!")
-#             dindex <- get.dindex()
-#             tmpqty <- ordersubset[oo.idx[lorder], "Order.Qty"]
-#             if (tmpqty == "all") {
-#               tmpqty = 0
-#             }
-#             if (tmpqty == 0) {
-#               side <- ordersubset[oo.idx[lorder], "Order.Side"]
-#               if (side == "long") 
-#                 tmpqty = -1
-#               else tmpqty = 1
-#             }
-#             tmpqty <- as.numeric(tmpqty)
-#             tmpprice <- as.numeric(ordersubset[oo.idx[lorder], "Order.Price"])
-#             if (tmpqty > 0) {
-#               relationship = "lte"
-#               if (isBBOmktdata) {
-#                 col <- first(colnames(mktdata)[has.Ask(mktdata, which = TRUE)])
-#               }
-#               else if (isOHLCmktdata) {
-#                 col <- first(colnames(mktdata)[has.Lo(mktdata, which = TRUE)])
-#               }
-#               else {
-#                 col <- first(colnames(mktdata)[grep(prefer, colnames(mktdata))])
-#               }
-#               if (is.na(col)) 
-#                 stop("no price discernable for stoplimit in applyRules")
-#             } else {
-#               relationship = "gte"
-#               if (isBBOmktdata) {
-#                 col <- first(colnames(mktdata)[has.Bid(mktdata, which = TRUE)])
-#               }
-#               else if (isOHLCmktdata) {
-#                 col <- first(colnames(mktdata)[has.Hi(mktdata, which = TRUE)])
-#               }
-#               else {
-#                 col <- first(colnames(mktdata)[grep(prefer, colnames(mktdata))])
-#               }
-#               if (is.na(col)) 
-#                 stop("no price discernable for stoplimit in applyRules")
-#             }
-#             
-#             cross <- sigThreshold(label = "tmplimit", column = col, threshold = tmpprice, relationship = relationship)
-#             if (any(cross[timespan])) {
-#               newidx <- curIndex + which(cross[timespan])[1]
-#               assign.dindex(c(get.dindex(), newidx))
-#             }
-#           }
-#         }
-#         
-# #         if (!length(grep("trailing", ordersubset[oo.idx, "Order.Type"])) == 0) {
-# #           trailorders <- grep("trailing", ordersubset[oo.idx, "Order.Type"])
-# #           for (torder in trailorders) {
-# #             dindex <- get.dindex()
-# #             firsttime <- NULL
-# #             neworders <- NULL
-# #             onum <- oo.idx[torder]
-# #             orderThreshold <- as.numeric(ordersubset[onum, "Order.Threshold"])
-# #             tmpqty <- ordersubset[onum, "Order.Qty"]
-# #             if (tmpqty == "all") {
-# #               tmpqty = 0
-# #             }
-# #             if (tmpqty == 0) {
-# #               side <- ordersubset[oo.idx[torder], "Order.Side"]
-# #               if (side == "long") 
-# #                 tmpqty = -1
-# #               else tmpqty = 1
-# #             }
-# #             tmpqty <- as.numeric(tmpqty)
-# #             if (tmpqty == 0) {
-# #               side <- ordersubset[onum, "Order.Side"]
-# #               if (side == "long") 
-# #                 tmpqty = -1
-# #               else tmpqty = 1
-# #             }
-# #             tmpqty <- as.numeric(tmpqty)
-# #             tmpprice <- as.numeric(ordersubset[onum, "Order.Price"])
-# #             tmpidx <- format(index(ordersubset[onum,]), "%Y-%m-%d %H:%M:%OS6")
-# #             if (isBBOmktdata) {
-# #               if (tmpqty > 0) {
-# #                 #prefer = "offer"
-# #                 prefer = "ask"
-# #               }
-# #               else {
-# #                 prefer = "bid"
-# #               }
-# #             } else if (isOHLCmktdata) {
-# #               prefer = "close"
-# #             }
-# #             
-# #             if (is.null(firsttime)) { 
-# #               firsttime <- timestamp
-# #             }
-# #             dindex <- get.dindex()
-# #             nextidx <- min(dindex[dindex > curIndex])
-# #             if (length(nextidx)) {
-# #               nextstamp <- format(index(mktdata[nextidx,]), "%Y-%m-%d %H:%M:%OS6")
-# #               timespan <- paste(format(firsttime, "%Y-%m-%d %H:%M:%OS6"), "::", nextstamp, sep = "")
-# #               mkt_price_series <- getPrice(mktdata[timespan], prefer = prefer)
-# #               col <- first(colnames(mkt_price_series))
-# #               orderloop <- TRUE
-# #             } else {
-# #               orderloop <- FALSE
-# #             }
-# #             
-# #             mkt_price_series <- getPrice(mktdata[timespan], prefer = prefer)
-# #             drawdown <- mkt_price_series - cummax(mkt_price_series)
-# #             drawdown <- drawdown * ifelse(tmpqty < 0, 1, -1)
-# #             colnames(drawdown) <- "drawdown"
-# #             ddrawdown <<- drawdown
-# #             relationship = ifelse(tmpqty > 0, "gte", "lte")
-# #             cross <- sigThreshold(data=drawdown, label="", column="drawdown", threshold=orderThreshold, relationship=relationship)
-# #             if (any(cross)) {
-# #               newidx <- curIndex + which(cross)[1] - 1
-# #               assign.dindex(c(get.dindex(), newidx))
-# #             }
-# #           }
-# #         }
-#         
-#         if (!length(grep("trailing", ordersubset[oo.idx, "Order.Type"])) == 0) {
-#           trailorders <- grep("trailing", ordersubset[oo.idx, "Order.Type"])
-#           for (torder in trailorders) {
-#             dindex <- get.dindex()
-#             firsttime <- NULL
-#             neworders <- NULL
-#             onum <- oo.idx[torder]
-#             orderThreshold <- as.numeric(ordersubset[onum, "Order.Threshold"])
-#             tmpqty <- ordersubset[onum, "Order.Qty"]
-#             if (tmpqty == "all") {
-#               tmpqty = 0
-#             }
-#             if (tmpqty == 0) {
-#               side <- ordersubset[oo.idx[torder], "Order.Side"]
-#               if (side == "long") 
-#                 tmpqty = -1
-#               else tmpqty = 1
-#             }
-#             tmpqty <- as.numeric(tmpqty)
-#             if (tmpqty == 0) {
-#               side <- ordersubset[onum, "Order.Side"]
-#               if (side == "long") 
-#                 tmpqty = -1
-#               else tmpqty = 1
-#             }
-#             tmpqty <- as.numeric(tmpqty)
-#             tmpprice <- as.numeric(ordersubset[onum, "Order.Price"])
-#             tmpidx <- format(index(ordersubset[onum,]), "%Y-%m-%d %H:%M:%OS6")
-#             if (isBBOmktdata) {
-#               if (tmpqty > 0) {
-#                 #prefer = "offer"
-#                 prefer = "ask"
-#               }
-#               else {
-#                 prefer = "bid"
-#               }
-#             } else if (isOHLCmktdata) {
-#               prefer = "close"
-#             }
-#             dindex <- get.dindex()
-#             if (is.null(firsttime)) 
-#               firsttime <- timestamp
-#             nextidx <- min(dindex[dindex > curIndex])
-#             if (length(nextidx)) {
-#               nextstamp <- format(index(mktdata[nextidx,]), "%Y-%m-%d %H:%M:%OS6")
-#               timespan <- paste(format(firsttime, "%Y-%m-%d %H:%M:%OS6"), "::", nextstamp, sep = "")
-#               
-#               mkt_price_series <- getPrice(mktdata[timespan], prefer = prefer)
-#               col <- first(colnames(mkt_price_series))
-#               orderloop <- TRUE
-#             } else {
-#               orderloop <- FALSE
-#             }
-#            
-#           
-#             if (tmpqty > 0) {
-#               move_order <- ifelse((mkt_price_series + orderThreshold) < tmpprice, TRUE, FALSE)
-#               relationship = "gte"
-#             } else {
-#               move_order <- ifelse((mkt_price_series + orderThreshold) > tmpprice, TRUE, FALSE)
-#               relationship = "lte"
-#             }
-#             tmpidx <- NULL
-#             if (any(move_order)) {
-#               dindex <- get.dindex()
-#               orderidx <- first(which(move_order))
-#               if (is.null(tmpidx)) {
-#                 tmpidx <- format(index(move_order[orderidx,]), "%Y-%m-%d %H:%M:%OS6")
-#               }
-#               trailspan <- paste(format(firsttime, "%Y-%m-%d %H:%M:%OS6"), "::", tmpidx, sep = "")
-#               cross <- sigThreshold(data = mkt_price_series, label = "tmptrail", column = col, threshold = tmpprice, relationship = relationship)
-#               if (any(cross[trailspan])) {
-#                 newidx <- curIndex + which(cross[trailspan])[1] - 1
-#                 newidx <- index(mktdata[index(which(cross[trailspan])[1]), which.i = TRUE])
-#                 assign.dindex(c(get.dindex(), newidx))
-#               } else {
-#                 moveidx <- index(mktdata[index(move_order[orderidx,]), which.i = TRUE])
-#                 assign.dindex(c(get.dindex(), moveidx))
-#               }
-#             }
-#           }
-#         }
-#         
-#         
-#         
-#       }
-#     }
-#     
-#     if (curIndex) {
-#       if (hasmktord) {
-#         curIndex <- curIndex + 1
-#         dindex <- get.dindex()
-#       } else {
-#         dindex <- get.dindex()
-#         if (any(dindex > curIndex)) {
-#           curIndex <- min(dindex[dindex > curIndex])
-#         } else { 
-#           curIndex <- FALSE
-#         }
-#       }
-#     }
-#     
-#     if (is.na(curIndex) || curIndex > length(index(mktdata))) 
-#       curIndex = FALSE
-#     return(curIndex)
-#   }
-#   
-#   # path.dep testing starts here.
-#   hold = FALSE
-#   holdtill = first(time(Dates)) - 1
-#   mktinstr <- getInstrument(symbol)
-#   curIndex <- 1
-#   
-#   while (curIndex) {
-#     timestamp = Dates[curIndex]
-#     if (isTRUE(hold) & holdtill < timestamp) {
-#       hold = FALSE
-#       holdtill = NULL
-#     }
-#     if (is.null(rule.order)) {
-#       types <- sort(factor(names(strategy$rules), levels = c("pre", "risk", "order", "rebalance", "exit", "enter", "entry", "post")))
-#     }
-#     else {
-#       print("Be aware that order of operations matters, and poor choises in rule order can create unintended consequences.")
-#       types <- rule.order
-#     }
-#     for (type in types) {
-#       switch(type, pre = {
-#         if (length(strategy$rules[[type]]) >= 1) {
-#           ruleProc(strategy$rules$pre, timestamp = timestamp, path.dep = path.dep, mktdata = mktdata, portfolio = portfolio, symbol = symbol, ruletype = type, mktinstr = mktinstr, ...)
-#         }
-#       }, risk = {
-#         if (length(strategy$rules$risk) >= 1) {
-#           ruleProc(strategy$rules$risk, timestamp = timestamp, path.dep = path.dep, mktdata = mktdata, portfolio = portfolio, symbol = symbol, ruletype = type, mktinstr = mktinstr, ...)
-#         }
-#       }, order = {
-#         if (length(strategy$rules[[type]]) >= 1) {
-#           ruleProc(strategy$rules[[type]], timestamp = timestamp, path.dep = path.dep, mktdata = mktdata, portfolio = portfolio, symbol = symbol, ruletype = type, mktinstr = mktinstr, ...)
-#         } else {
-#           if (isTRUE(path.dep)) {
-#             timespan <- format(timestamp, "::%Y-%m-%d %H:%M:%OS6")
-#           } else {
-#             timespan = NULL
-#           }
-#           ruleOrderProc(portfolio = portfolio, symbol = symbol, mktdata = mktdata, timespan = timespan, ...)
-#         }
-#       }, rebalance = , exit = , enter = , entry = {
-#         if (isTRUE(hold)) next()
-#         if (length(strategy$rules[[type]]) >= 1) {
-#           ruleProc(strategy$rules[[type]], timestamp = timestamp, path.dep = path.dep, mktdata = mktdata, portfolio = portfolio, symbol = symbol, ruletype = type, mktinstr = mktinstr, ...)
-#         }
-#         if (isTRUE(path.dep) && length(getOrders(portfolio = portfolio, symbol = symbol, status = "open", timespan = timestamp, which.i = TRUE))) {
-#         }
-#       }, post = {
-#         if (length(strategy$rules$post) >= 1) {
-#           ruleProc(strategy$rules$post, timestamp = timestamp, path.dep = path.dep, mktdata = mktdata, portfolio = portfolio, symbol = symbol, ruletype = type, mktinstr = mktinstr, ...)
-#         }
-#       })
-#     }
-#     
-#     # see orderbook
-# #     if (path.dep) {
-# #       cat("Orderbook at ", format(timestamp, "%Y-%m-%d %H:%M:%OS2"), "\n")
-# #       ob <- getOrderBook(portfolio)[[portfolio]][[symbol]]
-# #       print(ob)
-# #     }
-#     
-#     if (isTRUE(path.dep)) {
-#       curIndex <- nextIndex(curIndex, ...)
-#     } else {
-#       curIndex = FALSE
-#     }
-#   }
-#   
-#   mktdata <<- mktdata
-#   if (is.null(ret)) {
-#     return(mktdata)
-#   }
-#   else return(ret)
-# }
-
 applyRules <- function(portfolio, symbol, strategy, mktdata, Dates=NULL, indicators=NULL, signals=NULL, parameters=NULL, ..., path.dep=TRUE, rule.order=NULL) {
   # TODO check for symbol name in mktdata using Josh's code:
   # symbol <- strsplit(colnames(mktdata)[1],"\\.")[[1]][1]
@@ -537,7 +33,7 @@ applyRules <- function(portfolio, symbol, strategy, mktdata, Dates=NULL, indicat
   
   ruleProc <- function (ruletypelist, timestamp=NULL, path.dep, ruletype, ...){
     if (!is.null(timestamp)) {
-      cat(timestamp, ": in ruleProc for ", ruletype, "\n")
+#       cat(timestamp, ": in ruleProc for ", ruletype, "\n")
     }
     for (rule in ruletypelist) {
       #TODO check to see if they've already been calculated
@@ -646,7 +142,7 @@ applyRules <- function(portfolio, symbol, strategy, mktdata, Dates=NULL, indicat
   } # end dindex initialization
   
   nextIndex <- function(curIndex,...) {
-    cat("timeindex move forward, nextIndex called\n")
+#     cat("timeindex move forward, nextIndex called\n")
 
     if (!isTRUE(path.dep)){
       curIndex = FALSE
@@ -861,31 +357,31 @@ applyRules <- function(portfolio, symbol, strategy, mktdata, Dates=NULL, indicat
               relationship = "lte"
             }
                         
-            tmpidx <- NULL
-            if (any(move_order)) {
-              dindex <- get.dindex()
-              #print(firsttime)
-              # find first index where we would move an order
-              orderidx <- first(which(move_order)) 
-              if (is.null(tmpidx))
-                tmpidx <- format(index(move_order[orderidx,]), "%Y-%m-%d %H:%M:%OS6")
-              
-              trailspan <- paste(format(firsttime, "%Y-%m-%d %H:%M:%OS6"), "::", tmpidx, sep='')
-              #make sure we don't cross before then 
-              # use sigThreshold
-              cross <- sigThreshold(data=mkt_price_series, label='tmptrail', column=col, threshold=tmpprice, relationship=relationship)
-              # find first index that would cross after this index
-              if (any(cross[trailspan])) {
-                newidx <- curIndex + which(cross[trailspan])[1] - 1  #curIndex/firsttime was 1 in the subset, we need a -1 offset?
-                newidx <- index(mktdata[index(which(cross[trailspan])[1]), which.i=TRUE])
-                # insert that into dindex
-                assign.dindex(c(get.dindex(),newidx))
-              } else {
-                #if we don't cross, do this
-                moveidx <- index(mktdata[index(move_order[orderidx,]), which.i=TRUE])
-                assign.dindex(c(get.dindex(), moveidx))
-              }    
-            } # end any(move_order) check 
+#             tmpidx <- NULL
+#             if (any(move_order)) {
+#               dindex <- get.dindex()
+#               #print(firsttime)
+#               # find first index where we would move an order
+#               orderidx <- first(which(move_order))
+#               if (is.null(tmpidx))
+#                 tmpidx <- format(index(move_order[orderidx,]), "%Y-%m-%d %H:%M:%OS6")
+#               
+#               trailspan <- paste(format(firsttime, "%Y-%m-%d %H:%M:%OS6"), "::", tmpidx, sep='')
+#               #make sure we don't cross before then 
+#               # use sigThreshold
+#               cross <- sigThreshold(data=mkt_price_series, label='tmptrail', column=col, threshold=tmpprice, relationship=relationship)
+#               # find first index that would cross after this index
+#               if (any(cross[trailspan])) {
+#                 newidx <- curIndex + which(cross[trailspan])[1] - 1  #curIndex/firsttime was 1 in the subset, we need a -1 offset?
+#                 newidx <- index(mktdata[index(which(cross[trailspan])[1]), which.i=TRUE])
+#                 # insert that into dindex
+#                 assign.dindex(c(get.dindex(),newidx))
+#               } else {
+#                 #if we don't cross, do this
+#                 moveidx <- index(mktdata[index(move_order[orderidx,]), which.i=TRUE])
+#                 assign.dindex(c(get.dindex(), moveidx))
+#               }    
+#             } # end any(move_order) check 
             
             mkt_price_series <- getPrice(mktdata[timespan], prefer = prefer)
             drawdown <- mkt_price_series - cummax(mkt_price_series)
@@ -897,12 +393,7 @@ applyRules <- function(portfolio, symbol, strategy, mktdata, Dates=NULL, indicat
             if (any(cross)) {
               newidx <- curIndex + which(cross)[1] - 1
               assign.dindex(c(get.dindex(), newidx))
-            } else {
-              #if we don't cross, do this
-              moveidx <- index(mktdata[index(move_order[orderidx,]), which.i=TRUE])
-              assign.dindex(c(get.dindex(), moveidx))
             }
-            
           } # end loop over open trailing orders
         } # end if for trailing orders
       } # end else clause for any open orders in this timespan    
@@ -937,7 +428,7 @@ applyRules <- function(portfolio, symbol, strategy, mktdata, Dates=NULL, indicat
   
   while (curIndex) {
     timestamp = Dates[curIndex]    
-    cat("start.....\n")
+#     cat("start.....\n")
     # check to see if we need to release a hold
     if (isTRUE(hold) & holdtill<timestamp) {
       hold = FALSE
@@ -1014,7 +505,7 @@ ruleOrderProc <- function(portfolio, symbol, mktdata, timespan=NULL, ordertype=N
   if (is.null(timespan)) return()
   
   timestamp <- time(last(mktdata[timespan]))
-  cat(format(timestamp, "%Y-%m-%d %H:%M:%OS6"), ": in ruleOrderProc\n")
+#   cat(format(timestamp, "%Y-%m-%d %H:%M:%OS6"), ": in ruleOrderProc\n")
 
   orderbook <- getOrderBook(portfolio)
   ordersubset <- orderbook[[portfolio]][[symbol]]
@@ -1277,7 +768,7 @@ ruleOrderProc <- function(portfolio, symbol, mktdata, timespan=NULL, ordertype=N
             ordersubset[OpenInOrderset.i, "Order.StatusTime"]<-format(timestamp, "%Y-%m-%d %H:%M:%S")
           } 
       }
-      cat("an ", orderType, " order handled(closed,replaced,rejected\n")
+#       cat("an ", orderType, " order handled(closed,replaced,rejected\n")
     } #end loop over open orders
     
     if(!is.null(neworders)) ordersubset = rbind(ordersubset,neworders)
@@ -1415,7 +906,7 @@ ruleSignal <- function(data=mktdata, timestamp, sigcol, sigval, orderqty=0, orde
                TxnFees=TxnFees,
                label=label)
       
-      cat(ordertype, " order added!\n")
+#       cat(ordertype, " order added!\n")
     }
   }
   if(sethold) hold <<- TRUE
