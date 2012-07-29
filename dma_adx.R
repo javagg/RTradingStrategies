@@ -160,6 +160,8 @@ trade <- function(symbol, day) {
 }
 
 symbols <- c("IF1202", "IF1203", "IF1204", "IF1205", "IF1206", "IF1207", "IF1208")
+symbols <- c("IF1208")
+
 open.timespan <- "T09:15/T15:15"
 for (symbol in symbols) {
   mkt <- get(symbol)
