@@ -11,12 +11,12 @@ options(width=240)
 ###############################################################################
 # Parameters
 ###############################################################################
-fastEMA <- 2 
-slowEMA <- 16
+fastEMA <- 20 
+slowEMA <- 50
 adx.min <- 12
 adx.max <- 58
 stoplimit.threshold <- -0.4
-stoptrailing.threshold <- -0.3
+stoptrailing.threshold <- -3
 qty <- 1
 txnfee <- -0.15/2
 enter.timespan <- "T09:15/T15:13"
@@ -24,6 +24,18 @@ exit.timespan <- "T15:14/T15:15"
 
 start.time <- '2012-07-24T09:15'
 initial.equity <- 1000000
+
+osOp <- function (timestamp, orderqty, portfolio, symbol, ruletype, ...) {
+  if (orderqty == "all" && !(ruletype == "exit" || ruletype == "risk")) {
+    stop(paste("orderqty 'all' would produce nonsense, maybe use osMaxPos instead?\n", "Order Details:\n", "Timestamp:", timestamp, "Qty:", orderqty, "Symbol:", symbol))
+    orderqty = 0
+  }
+  return(orderqty)
+}
+
+# myOrderProc <- function(portfolio, symbol, mktdata, timespan = NULL, ordertype = NULL, ..., slippageFUN = NULL)) {
+#   
+# }
 
 ABC <- function(x) {
   return(cbind(As(x), Bi(x), Cl(x)))
@@ -63,7 +75,7 @@ sigMarketClose <- function(label, data = mktdata, timespan) {
   return(signal)
 }
 
-trade <- function(symbol) {
+trade <- function(symbol, day) {
   strategy.name <- "dma_adx"
   portfolio.name <- strategy.name
   account.name <- strategy.name
@@ -107,14 +119,14 @@ trade <- function(symbol) {
   strat <- add.rule(strat, label="signal.enter", name="ruleSignal", arguments = list(sigcol="buy.long", sigval=T, orderqty=qty, ordertype='market', orderside='long', pricemethod='market', replace=F, TxnFees=txnfee), type='enter', timespan=enter.timespan)
   strat <- add.rule(strat, label='signal.exit', name="ruleSignal", arguments = list(sigcol="fast.cross.below.slow", sigval=T, orderqty="all", ordertype='market', orderside='long', pricemethod='market', replace=F, TxnFees=txnfee, orderset="exit"), type='exit')
   # strat <- add.rule(strat, label='stoploss.exit', name="ruleSignal", arguments = list(sigcol="buy.long", sigval=T, orderqty="all", ordertype='stoplimit', orderside='long', threshold=stoploss.threshold, tmult=T, TxnFees=txnfee, orderset="exit2"), type='risk')
-  strat <- add.rule(strat, label='stoptrailing.exit', name="ruleSignal", arguments = list(sigcol="buy.long", sigval=T, orderqty="all", ordertype='stoptrailing', orderside='long', threshold=stoptrailing.threshold, tmult=T, TxnFees=txnfee, orderset="exit2"), type='risk')
+  strat <- add.rule(strat, label='stoptrailing.exit', name="ruleSignal", arguments = list(sigcol="buy.long", sigval=T, orderqty="all", ordertype='stoptrailing', orderside='long', threshold=stoptrailing.threshold, tmult=F, TxnFees=txnfee, orderset="exit2"), type='risk')
   strat <- add.rule(strat, name="ruleSignal", arguments = list(sigcol="market.close", sigval=T, orderqty="all", ordertype='market', orderside='long'), type='risk')
   
   # sell short
   strat <- add.rule(strat, label="signal.enter", name="ruleSignal", arguments = list(sigcol="sell.short", sigval=T, orderqty=-qty, ordertype='market', orderside='short', pricemethod='market', replace=F, TxnFees=txnfee), type='enter', timespan=enter.timespan)
   strat <- add.rule(strat, label='signal.exit', name="ruleSignal", arguments = list(sigcol="fast.cross.above.slow", sigval=T, orderqty="all", ordertype='market', orderside='short', pricemethod='market', replace=F, TxnFees=txnfee, orderset="exit"), type='exit')
   # strat <- add.rule(strat, label='stoploss.exit', name="ruleSignal", arguments = list(sigcol="sell.short", sigval=T, orderqty="all", ordertype='stoplimit', orderside='short', threshold=stoploss.threshold, tmult=T, TxnFees=txnfee, orderset="exit2"), type='risk')
-  strat <- add.rule(strat, label='stoptrailing.exit', name="ruleSignal", arguments = list(sigcol="sell.short", sigval=T, orderqty="all", ordertype='stoptrailing', orderside='short', threshold=stoptrailing.threshold, tmult=T, TxnFees=txnfee, orderset="exit2"), type='risk')
+  strat <- add.rule(strat, label='stoptrailing.exit', name="ruleSignal", arguments = list(sigcol="sell.short", sigval=T, orderqty="all", ordertype='stoptrailing', orderside='short', threshold=-stoptrailing.threshold, tmult=F, TxnFees=txnfee, orderset="exit2"), type='risk')
   strat <- add.rule(strat, name="ruleSignal", arguments = list(sigcol="market.close", sigval=T, orderqty="all", ordertype='market', orderside='short'), type='risk')
   
   addPosLimit(portfolio.name, symbol, timestamp=start.time, maxpos=qty, minpos=-qty)
@@ -140,10 +152,11 @@ trade <- function(symbol) {
   #print(book)
   dailyEqPL(portfolio.name, drop.time=F)
   dailyTxnPL(portfolio.name, drop.time=F)
-  tradeStats(portfolio.name)
+  print(tradeStats(portfolio.name))
   dailyStats(portfolio.name)
   getEndEq(account.name, Date=Sys.time())
   getPosQty(portfolio.name, Symbol=symbol, Date=Sys.time())
+
 }
 
 symbols <- c("IF1202", "IF1203", "IF1204", "IF1205", "IF1206", "IF1207", "IF1208")
@@ -156,7 +169,12 @@ for (symbol in symbols) {
   for (day in days) {
     daydata <- mkt[day]
     assign(symbol, daydata)
-    print(head(daydata))
-    trade(symbol)
+    png(paste(symbol, day, "png", sep="."))
+    sink(paste(symbol, day, "txt", sep="."))
+    trade(symbol, day)
+    sink()
+    dev.off()
   }
+  rm(symbol)
 }
+

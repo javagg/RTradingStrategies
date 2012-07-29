@@ -16,8 +16,9 @@ suppressWarnings(rm("account.st","portfolio.st","stock.str","stratMACROSS","init
 stock.str='MSFT' # what are we trying it on
 currency('USD')
 stock(stock.str,currency='USD',multiplier=1)
-initDate='2008-06-30'
+initDate='2010-11-30'
 initEq=1000000
+
 portfolio.st='macross'
 account.st='macross'
 initPortf(portfolio.st,symbols=stock.str, initDate=initDate)
@@ -30,23 +31,35 @@ stratMACROSS <- add.indicator(strategy = stratMACROSS, name = "SMA", arguments =
 stratMACROSS <- add.indicator(strategy = stratMACROSS, name = "SMA", arguments = list(x=quote(Cl(mktdata)), n=200),label= "ma200")
 
 stratMACROSS <- add.signal(strategy = stratMACROSS,name="sigCrossover",arguments = list(columns=c("ma50","ma200"), relationship="gte"),label="ma50.gt.ma200")
-stratMACROSS <- add.signal(strategy = stratMACROSS,name="sigCrossover",arguments = list(column=c("ma50","ma200"),relationship="lt"),label="ma50.lt.ma200")
+stratMACROSS <- add.signal(strategy = stratMACROSS,name="sigCrossover",arguments = list(column=c("ma50","ma200"), relationship="lt"),label="ma50.lt.ma200")
 
-stratMACROSS <- add.rule(strategy = stratMACROSS, name='ruleSignal', arguments = list(sigcol="ma50.gt.ma200",sigval=TRUE, orderqty=100, ordertype='market', orderside='long'),type='enter')
-stratMACROSS <- add.rule(strategy = stratMACROSS, label="signalexit", name='ruleSignal', arguments = list(sigcol="ma50.lt.ma200",sigval=TRUE, orderqty="all", ordertype='market', orderside='long', orderset="exit2"),type='exit')
-# take-profit exit
-
-#stratMACROSS <- add.rule(strategy = stratMACROSS, label="takeprofitexit", name='ruleSignal', arguments = list(sigcol="ma50.gt.ma200", sigval=TRUE, orderqty="all", ordertype='limit', orderside='long', threshold=+1, tmult=F, orderset="altexit1"),type='exit')
-# stop-loss exit
-#stratMACROSS <- add.rule(strategy = stratMACROSS, label="stoplossexit", name='ruleSignal', arguments = list(sigcol="ma50.gt.ma200",sigval=TRUE, orderqty="all", ordertype='stoplimit', orderside='long', threshold=-2,tmult=F, orderset="altexit"),type='exit')
-
-# trailing stop exit
-stratMACROSS <- add.rule(strategy = stratMACROSS, label="stoptrailingexit", name='ruleSignal', arguments = list(sigcol="ma50.gt.ma200",sigval=TRUE, orderqty="all", ordertype='stoptrailing', orderside='long', threshold=-2.0,tmult=F, orderset="altexit"), type='exit')
+# buy long
+# stratMACROSS <- add.rule(strategy = stratMACROSS, name='ruleSignal', arguments = list(sigcol="ma50.gt.ma200",sigval=TRUE, orderqty=100, ordertype='market', orderside='long'),type='enter')
+# stratMACROSS <- add.rule(strategy = stratMACROSS, label="signalexit", name='ruleSignal', arguments = list(sigcol="ma50.lt.ma200",sigval=TRUE, orderqty="all", ordertype='market', orderside='long', orderset="exit2"),type='exit')
+# # take-profit exit
+# #stratMACROSS <- add.rule(strategy = stratMACROSS, label="takeprofitexit", name='ruleSignal', arguments = list(sigcol="ma50.gt.ma200", sigval=TRUE, orderqty="all", ordertype='limit', orderside='long', threshold=+1, tmult=F, orderset="altexit1"),type='exit')
+# # stop-loss exit
+# #stratMACROSS <- add.rule(strategy = stratMACROSS, label="stoplossexit", name='ruleSignal', arguments = list(sigcol="ma50.gt.ma200",sigval=TRUE, orderqty="all", ordertype='stoplimit', orderside='long', threshold=-2,tmult=F, orderset="altexit"),type='exit')
+# # trailing stop exit
+#stratMACROSS <- add.rule(strategy = stratMACROSS, label="stoptrailingexit", name='ruleSignal', arguments = list(sigcol="ma50.gt.ma200",sigval=TRUE, orderqty="all", ordertype='stoptrailing', orderside='long', threshold=-3.0,tmult=F, orderset="altexit"), type='exit')
 
 # if you want a long/short Stops and Reverse MA cross strategy, you'd add two more rules for the short side:
 
 # stratMACROSS <- add.rule(strategy = stratMACROSS,name='ruleSignal', arguments = list(sigcol="ma50.lt.ma200",sigval=TRUE, orderqty=-100, ordertype='market', orderside='short'),type='enter')
 # stratMACROSS <- add.rule(strategy = stratMACROSS,name='ruleSignal', arguments = list(sigcol="ma50.gt.ma200",sigval=TRUE, orderqty="all", ordertype='market', orderside='short'),type='exit')
+
+# sell short
+stratMACROSS <- add.rule(strategy = stratMACROSS, label="signal.enter", name='ruleSignal', arguments = list(sigcol="ma50.lt.ma200", sigval=TRUE, orderqty=-100, ordertype='market', orderside='short'), type='enter')
+#stratMACROSS <- add.rule(strategy = stratMACROSS, label="signal.exit", name='ruleSignal', arguments = list(sigcol="ma50.gt.ma200", sigval=TRUE, orderqty="all", ordertype='market', orderside='short', orderset="exit2"), type='exit')
+# stop-loss exit
+#stratMACROSS <- add.rule(strategy = stratMACROSS, label="stoploss.exit", name='ruleSignal', arguments=list(sigcol="ma50.lt.ma200",sigval=TRUE, orderqty="all", ordertype='stoplimit', orderside='short', threshold=2,tmult=F, orderset="altexit"), type='exit')
+# take-profit exit
+#stratMACROSS <- add.rule(strategy = stratMACROSS, label="takeprofit.exit", name='ruleSignal', arguments=list(sigcol="ma50.lt.ma200", sigval=TRUE, orderqty="all", ordertype='limit', orderside='short', threshold=-1, tmult=F, orderset="altexit1"), type='exit')
+# trailing stop exit
+stratMACROSS <- add.rule(strategy = stratMACROSS, label="stoptrailing.exit", name='ruleSignal', arguments = list(sigcol="ma50.lt.ma200",sigval=TRUE, orderqty="all", ordertype='stoptrailing', orderside='short', threshold=1, tmult=F, orderset="altexit"), type='exit')
+
+# load(file.path(current.dir, paste(stock.str, "rda", sep=".")))
+# assign(stock.str, get(stock.str)[paste(initDate,"::", sep="")])
 
 getSymbols(stock.str,from=initDate)
 for(i in stock.str)
