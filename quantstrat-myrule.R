@@ -384,8 +384,8 @@ applyRules <- function(portfolio, symbol, strategy, mktdata, Dates=NULL, indicat
               colnames(drawdown) <- c("drawdown", "mkt.price", "threshold", "cross", "last.peak.price","peak.index")
               ddrawdown <<- drawdown
               
-              print(timestamp)
-              print("addddddddd")
+#               print(timestamp)
+#               print("addddddddd")
               neworder <- addOrder(portfolio=portfolio, symbol=symbol, timestamp=peak.price.timestamp, qty=ordersubset[onum,"Order.Qty"], price=max.market.price, 
                 ordertype=ordersubset[onum,"Order.Type"], side=ordersubset[onum,"Order.Side"], orderset=ordersubset[onum, "Order.Set"], threshold=orderThreshold,
                 status="open", replace=T, return=T, ...=..., TxnFees=ordersubset[onum,"Txn.Fees"], label=ordersubset[onum,"Rule"])
@@ -754,135 +754,397 @@ ruleOrderProc <- function(portfolio, symbol, mktdata, timespan=NULL, ordertype=N
     
 assignInNamespace("ruleOrderProc", ruleOrderProc, ns="quantstrat")
 
-ruleSignal <- function(data=mktdata, timestamp, sigcol, sigval, orderqty=0, ordertype, orderside=NULL, orderset=NULL, threshold=NULL, tmult=FALSE, replace=TRUE, delay=0.0001, osFUN='osNoOp', pricemethod=c('market','opside','active'), portfolio, symbol, ..., ruletype, TxnFees=0, prefer=NULL, sethold=FALSE, label='')
-{
-  if(!is.function(osFUN)) osFUN<-match.fun(osFUN)
-  #print(paste(symbol,timestamp, sigval))
-  #print(data[timestamp][,sigcol])
-  #browser()
-  if (!is.na(timestamp) && !is.na(data[timestamp][,sigcol]) && data[timestamp][,sigcol] == sigval) {
-    #calculate order price using pricemethod
-    pricemethod<-pricemethod[1] #only use the first if not set by calling function
-    
-    if(hasArg(prefer)) prefer=match.call(expand.dots=TRUE)$prefer
-    else prefer = NULL
-    
-    #if(hasArg(TxnFees)) TxnFees=match.call(expand.dots=TRUE)$TxnFees
-    #else TxnFees=0
-    
-    switch(pricemethod,
-           market = ,
-           opside = ,
-           active = {
-             if(is.BBO(data)){
-               if (orderqty>0) 
-                 prefer='ask'  # we're buying, so pay what they're asking
-               else
-                 prefer='bid'  # we're selling, so give it to them for what they're bidding  
-             } 
-             orderprice <- try(getPrice(x=data, prefer=prefer))[timestamp] 
-           },
-           passive =,
-           work =,
-           join = {
-             if(is.BBO(data)){
-               if (orderqty>0) 
-                 prefer='bid'  # we're buying, so work the bid price
-               else
-                 prefer='ask'  # we're selling, so work the ask price
-             }
-             orderprice <- try(getPrice(x=data, prefer=prefer))[timestamp]
-           },
-           maker = {
-             if(hasArg(price) & length(match.call(expand.dots=TRUE)$price)>1) {
-               # we have prices, just use them
-               orderprice <- try(match.call(expand.dots=TRUE)$price)
-             } else {
-               if(!is.null(threshold)) {
-                 baseprice<- last(getPrice(x=data)[timestamp]) # this should get either the last trade price or the Close
-                 if(hasArg(tmult) & isTRUE(match.call(expand.dots=TRUE)$tmult)) {
-                   baseprice<- last(getPrice(x=data)[timestamp]) # this should get either the last trade price or the Close
-                   # threshold is a multiplier of current price
-                   if (length(threshold)>1){
-                     orderprice <- baseprice * threshold # assume the user has set proper threshold multipliers for each side
-                   } else {
-                     orderprice <- c(baseprice*threshold,baseprice*(1+1-threshold)) #just bracket on both sides
-                   }
-                 } else {
-                   # tmult is FALSE or NULL, threshold is numeric
-                   if (length(threshold)>1){
-                     orderprice <- baseprice + threshold # assume the user has set proper threshold numerical offsets for each order
-                   } else {
-                     orderprice <- c(baseprice+threshold,baseprice+(-threshold)) #just bracket on both sides
-                   }
-                 }
-               } else{
-                 # no threshold, put it on the averages?
-                 stop('maker orders without specified prices and without threholds not (yet?) supported')
-                 if(is.BBO(data)){
-                   
-                 } else {
-                   
-                 }
-               }
-             }
-             if(length(orderqty)==1) orderqty <- c(orderqty,-orderqty) #create paired market maker orders at the same size
-           }
-    )
-    if(inherits(orderprice,'try-error')) orderprice<-NULL
-    if(length(orderprice>1) && !pricemethod=='maker') orderprice<-last(orderprice[timestamp])
-    if(!is.null(orderprice) && !is.null(ncol(orderprice))) orderprice <- orderprice[,1]
-    
-    if(is.null(orderside) & !isTRUE(orderqty == 0)){
-      curqty<-getPosQty(Portfolio=portfolio, Symbol=symbol, Date=timestamp)
-      if (curqty>0 ){
-        #we have a long position
-        orderside<-'long'
-      } else if (curqty<0){
-        #we have a short position
-        orderside<-'short'
-      } else {
-        # no current position, which way are we going?
-        if (orderqty>0) 
-          orderside<-'long'
-        else
-          orderside<-'short'
-      }
-    }
-    
-    if(is.null(orderset)) orderset=NA
-    
-    ## now size the order
-    #TODO add fancy formals matching for osFUN
-    if(orderqty!='all')
-    {
-      orderqty <- osFUN(strategy=strategy, data=data, timestamp=timestamp, orderqty=orderqty, ordertype=ordertype, orderside=orderside, portfolio=portfolio, symbol=symbol,...=...,ruletype=ruletype, orderprice=as.numeric(orderprice))
-    }
-    
-    if(!is.null(orderqty) && orderqty!=0 && !is.null(orderprice)) #orderprice could have length > 1
-    {
-      addOrder(portfolio=portfolio, 
-               symbol=symbol, 
-               timestamp=timestamp, 
-               qty=orderqty, 
-               price=as.numeric(orderprice), 
-               ordertype=ordertype, 
-               side=orderside, 
-               orderset=orderset, 
-               threshold=threshold, 
-               status="open", 
-               replace=replace , 
-               delay=delay, 
-               tmult=tmult, 
-               ...=..., 
-               prefer=prefer, 
-               TxnFees=TxnFees,
-               label=label)
-      
-#       cat(ordertype, " order added!\n")
-    }
-  }
-  if(sethold) hold <<- TRUE
-}
-
-assignInNamespace("ruleSignal", ruleSignal, ns="quantstrat")
+# applyParameter<-function(strategy, portfolios, parameterPool, parameterConstraints, method, sampleSize, verbose=FALSE, ...) {
+#   #need to create combination of distribution values in each slot of the parameterPool
+#   
+#   initialPortf<-getPortfolio(portfolios)
+#   stock.str<-names(initialPortf$symbols)
+#   initDate<-time(first(initialPortf$symbols[[1]]$posPL))
+#   
+#   tmp_strategy<-strategy
+#   
+#   testPackList<-list()
+#   testPackList$stats<-NULL
+#   
+#   testPackListPRLStructure<-list()
+#   testPackListPRLStructure$stats<-NULL
+#   
+#   
+#   
+#   if (!is.strategy(tmp_strategy)) {
+#     tmp_strategy<-try(getStrategy(tmp_strategy))
+#     if(inherits(tmp_strategy,"try-error"))
+#       stop ("You must supply an object of type 'strategy'.")
+#   } 
+#   
+#   
+#   out<-list()
+#   paramdist<-list()
+#   paramweight<-list()
+#   paramLabel<-list()
+#   lvmatch<-list()
+#   
+#   
+#   
+#   for (i in 1:length(parameterPool)){
+#     
+#     distr<-parameterPool[[i]]
+#     #paramdist[[i]]<-distr$distribution[[1]]
+#     paramdist[[paste('Param',distr$type,distr$indexnum,names(distr$distribution),sep='.')]]<-distr$distribution[[1]]
+#     paramweight[[paste('ParamWt',distr$type,distr$indexnum,names(distr$distribution),sep='.')]]<-distr$weight
+#     #paramdist[[paste(i)]]<-distr$distribution[[1]]
+#     
+#     #Build label<->var name match.
+#     lvmatch$label[i]<-distr$label
+#     lvmatch$varName[i]<-paste('Param',distr$type,distr$indexnum,names(distr$distribution),sep='.')
+#     
+#   }
+#   
+#   paramLabel<-data.frame(lvmatch,stringsAsFactors=FALSE)
+#   
+#   #TODO make it take sample size etc.
+#   
+#   
+#   
+#   if (method=='expand') 
+#   {
+#     paramTable<-expand.grid(paramdist, stringsAsFactors=FALSE)
+#   }
+#   else if (method=='random')
+#   {
+#     if (missing(sampleSize)) {stop ("sampleSize is needed")} 
+#     #paramTable<-data.frame()
+#     
+#     #genSample update the paramTable with more sample rows.
+#     genSample<-function(iparamTable,paramdist,tsampleSize,remainSize)
+#     {
+#       if (missing(remainSize) ) remainSize=tsampleSize
+#       
+#       tparamTable<-data.frame()
+#       
+#       for( i in 1:length(paramdist))
+#       {
+#         ireplace<-(length(paramdist[i])<tsampleSize)
+#         
+#         if (nrow(tparamTable)==0)
+#         {
+#           tparamTable<-data.frame(sample(paramdist[[i]],remainSize,prob=paramweight[[i]],replace=ireplace),stringsAsFactors=FALSE)
+#           
+#         }	
+#         else{
+#           tparamTable<-cbind(tparamTable,data.frame(sample(paramdist[[i]],remainSize,prob=paramweight[[i]],replace=ireplace),stringsAsFactors=FALSE))
+#         }										
+#       }
+#       
+#       names(tparamTable)<-names(paramdist)
+#       
+#       # put constraint test on tparamTable, before rbind
+#       for (k in 1:length(parameterConstraints))
+#       {
+#         constrintfill<-paramConstraint(label=parameterConstraints[[k]]$constraintLabel,
+#                                        data=tparamTable,
+#                                        columns=merge(paramLabel,data.frame(parameterConstraints[[k]]$paramList),by="label")$varName, #has to keep the order.
+#                                        relationship=parameterConstraints[[k]]$relationship)				
+#         
+#         
+#         #only keep the samples fulfill the constraints.
+#         tparamTable<-tparamTable[which(constrintfill==TRUE),]
+#       }
+#       
+#       
+#       iparamTable<-rbind(iparamTable,tparamTable)
+#       
+#       iparamTable<-unique(iparamTable)
+#       
+#       #			if(verbose >=1) print("nnnnnnnnnnnnnnnnnnnnnnn")
+#       #			if(verbose >=1) print(nrow(iparamTable))
+#       
+#       if (nrow(iparamTable)<tsampleSize)
+#       {
+#         iparamTable<-genSample(iparamTable,paramdist,tsampleSize,remainSize=tsampleSize-nrow(iparamTable))			
+#       }
+#       
+#       names(iparamTable)<-names(paramdist)
+#       return(iparamTable)
+#     } #end define function
+#     
+#     paramTable<-NULL
+#     paramTable<-genSample(paramTable,paramdist,sampleSize)		
+#     
+#   }
+#   
+#   
+#   testPackList$paramTable<-paramTable
+#   testPackList$paramdist<-paramdist
+#   testPackList$paramweight<-paramweight
+#   testPackList$paramLabel<-paramLabel
+#   
+#   strategyList<-list()
+#   if(verbose >=1) print("ParamTable generated")
+#   
+#   
+#   psize=nrow(paramTable)
+#   if(verbose >=1) print(psize)
+#   
+#   
+#   
+#   instruments<-as.list(FinancialInstrument:::.instrument)
+#   getSymbols<-as.list(.getSymbols)
+#   blotter<-as.list(.blotter)
+#   
+#   #Pack all symbols downloaded in .GlobalEnv
+#   symbols<-names(.getSymbols)
+#   
+#   testPackListPRL<-foreach (i = 1:psize, .export=c('instruments',symbols,'getSymbols','blotter','tmp_strategy'),.verbose=TRUE,...=...) %dopar% 
+#     
+# {
+#   if(verbose) print(paste('===> now starting parameter test', i))
+#   
+#   require(quantstrat, quietly=TRUE)
+#   
+#   # loops must be run with an empty .blotter environment each, or .blotter appears to accumulate portfolios and accounts
+#   # and passes them from one loop to the next on each CPU - JH July 2012
+#   if (getDoParRegistered() && getDoParWorkers()>1)
+#   {
+#     rm(list=ls(pos=.blotter), pos=.blotter)
+#     gc(verbose=verbose)
+#   }
+#   
+#   testPack<-list()
+#   
+#   #Pass environments needed.
+#   loadInstruments(instruments)
+#   .getSymbols<-as.environment(getSymbols)
+#   
+#   #Unpack symbols to worker. change later.
+#   #seems need to go through assign, rather than just .export the names...
+#   
+#   for (sym in symbols) {
+#     assign(sym, eval(as.name(sym)), .GlobalEnv)
+#   }
+#   
+#   #Create a copy of strategy object, so not to lock up on the sameone.
+#   PLtmp_strategy<-tmp_strategy
+#   
+#   #Extract parameter from table and construct PLtmp_strategy.
+#   for (j in 1:ncol(paramTable)){
+#     
+#     tmp_arg<-parameterPool[[j]]$distribution[1] #Just get the list form with name
+#     #tmp_arg<-list(tmp_argName=paramTable[i,j])
+#     tmp_arg[[1]]<-paramTable[i,j]
+#     
+#     tmp_index<-parameterPool[[j]]$indexnum
+#     
+#     switch(parameterPool[[j]]$type,
+#            'indicator'={
+#              #merge.list uses another package. PLtmp_strategy$indicators[[tmp_index]]$arguments<-merge.list(targ1,tmp_arg)
+#              targ1<-PLtmp_strategy$indicators[[tmp_index]]$arguments
+#              
+#              pnamepos<-pmatch(names(targ1),names(tmp_arg),nomatch=0L)
+#              if( any(pnamepos>0)){
+#                #just change the argument value itself will do ?or still need add.indicator??
+#                PLtmp_strategy$indicators[[tmp_index]]$arguments[which(pnamepos>0)]<-tmp_arg[1]
+#              }
+#              else{
+#                PLtmp_strategy$indicators[[tmp_index]]$arguments<-append(targ1,tmp_arg)
+#                
+#              }
+#              #OR still need add.*??
+#              #pass_arg<-append(,tmp_arg)
+#              #PLtmp_strategy <- add.indicator(strategy = PLtmp_strategy,name=PLtmp_strategy$indicators[[tmp_index]]$name, arguments = pass_arg,indexnum=tmp_index)
+#            },
+#            'signal'={
+#              
+#              targ1<-PLtmp_strategy$signals[[tmp_index]]$arguments
+#              
+#              pnamepos<-pmatch(names(targ1),names(tmp_arg),nomatch=0L)
+#              if( any(pnamepos>0)){
+#                #just change the argument value itself will do ?or still need add.indicator??
+#                
+#                PLtmp_strategy$signals[[tmp_index]]$arguments[which(pnamepos>0)]<-tmp_arg[1]
+#              }
+#              else{
+#                PLtmp_strategy$signals[[tmp_index]]$arguments<-append(targ1,tmp_arg)
+#                
+#              }
+#              
+#              #						pass_arg<-append(PLtmp_strategy$signal[[tmp_index]]$arguments,tmp_arg)
+#              #						PLtmp_strategy <- add.signal(strategy = PLtmp_strategy,name=PLtmp_strategy$signal[[tmp_index]]$name,arguments = tmp_arg,indexnum=tmp_index)
+#              
+#            },
+#            'order'={
+#              targ1<-PLtmp_strategy$rules$order[[tmp_index]]$arguments
+#              
+#              pnamepos<-pmatch(names(targ1),names(tmp_arg),nomatch=0L)
+#              if( any(pnamepos>0)){
+#                #just change the argument value itself will do ?or still need add.indicator??
+#                PLtmp_strategy$rules$order[[tmp_index]]$arguments[which(pnamepos>0)]<-tmp_arg[1]
+#              }
+#              else{
+#                PLtmp_strategy$rules$order[[tmp_index]]$arguments<-append(targ1,tmp_arg)
+#                
+#              }
+#            },
+#            'enter'={
+#              targ1<-PLtmp_strategy$rules$enter[[tmp_index]]$arguments
+#              
+#              pnamepos<-pmatch(names(targ1),names(tmp_arg),nomatch=0L)
+#              if( any(pnamepos>0)){
+#                #just change the argument value itself will do ?or still need add.indicator??
+#                PLtmp_strategy$rules$enter[[tmp_index]]$arguments[which(pnamepos>0)]<-tmp_arg[1]
+#              }
+#              else{
+#                PLtmp_strategy$rules$enter[[tmp_index]]$arguments<-append(targ1,tmp_arg)
+#                
+#              }						
+#            },
+#            'exit'={
+#              targ1<-PLtmp_strategy$rules$exit[[tmp_index]]$arguments
+#              
+#              pnamepos<-pmatch(names(targ1),names(tmp_arg),nomatch=0L)
+#              if( any(pnamepos>0)){
+#                #just change the argument value itself will do ?or still need add.indicator??
+#                PLtmp_strategy$rules$exit[[tmp_index]]$arguments[which(pnamepos>0)]<-tmp_arg[1]
+#              }
+#              else{
+#                PLtmp_strategy$rules$exit[[tmp_index]]$arguments<-append(targ1,tmp_arg)
+#                
+#              }
+#            }
+#     )
+#   } #loop j
+#   
+#   #Initial portfolio for each test		
+#   #######################################################################################
+#   
+#   testPack$portfolio.st<-paste(portfolios,'p',i,sep='.')
+#   testPack$account.st<-paste(portfolios,'p',i,sep='.')
+#   
+#   rmpstr<-paste('portfolio',testPack$portfolio.st,sep=".")
+#   rmastr<-paste('account',testPack$account.st,sep=".")
+#   
+#   try(rm(list = rmpstr, pos = .blotter),silent=FALSE)
+#   try(rm(list = rmastr, pos = .blotter),silent=FALSE)
+#   try(rm(list=paste("order_book",testPack$account.st,sep="."),pos=.strategy),silent=FALSE)
+#   
+#   if(verbose >=1) print('Initial portf')
+#   
+#   #				Decide not to remove the main obj from .blotter, incase of non-parallel run.
+#   #				try(rm(list=paste("order_book",portfolios,sep='.'),pos=.strategy),silent=TRUE)
+#   ##				try(rm(paste("account",portfolio.st,sep='.'),paste("portfolio",portfolio.st,sep='.'),pos=.blotter),silent=TRUE)
+#   #				try(rm(list=paste("account",portfolios,sep='.'),pos=.blotter))
+#   #				try(rm(list=paste("portfolio",portfolios,sep='.'),pos=.blotter))
+#   
+#   try({initPortf(testPack$portfolio.st,symbols=stock.str, initDate=initDate)})
+#   try({initAcct(testPack$account.st,testPack$portfolio.st, initDate=initDate)})
+#   try({initOrders(portfolio=testPack$portfolio.st,initDate=initDate)})
+#   
+#   # Apply strategy ######################################################################################
+#   if(verbose >=1) print("Apply strategy...")
+#   
+#   try(rm("PLtmp_strategy",pos=.strategy),silent=TRUE)
+#   
+#   if(verbose >=1) print(PLtmp_strategy$signals[[2]])
+#   
+#   assign("PLtmp_strategy1",PLtmp_strategy,envir=as.environment(.strategy))
+#   
+#   testPack$out<-try(applyStrategy(strategy=PLtmp_strategy , portfolios=testPack$portfolio.st ),...=...)
+#   testPack$strategy<-PLtmp_strategy
+#   
+#   # 	Update portfolio ######################################################################################
+#   
+#   #out<-try(applyStrategy(strategy=stratBBands , portfolios=portfolios ))
+#   #		try({
+#   #					updatePortf(testPack$portfolio.st,Date=initDate)
+#   #					updateAcct(testPack$account.st,Date=initDate)
+#   #					updateOrders(portfolio=testPack$portfolio.st)
+#   #				})
+#   
+#   
+#   #try(updatePortf(Portfolio=testPack$portfolio.st,Dates=paste('::',as.Date(Sys.time()),sep='')))
+#   updatePortf(Portfolio=testPack$portfolio.st,Dates=paste('::',as.Date(Sys.time()),sep=''))
+#   
+#   #no need to update account.
+#   #updateAcct(account.st,Dates=paste(startDate,endDate,sep="::")) 
+#   #updateEndEq(account.st,Dates=paste(startDate,endDate,sep="::"))
+#   #getEndEq(account.st,Sys.time())
+#   
+#   testPack$parameters<-paramTable[i,]
+#   
+#   testPack$stats<-tradeStats(Portfolios=testPack$portfolio.st)
+#   testPack$blotterl<-as.list(.blotter)
+#   #				testPack$blotter<-as.environment(.blotter)
+#   #				testPack$blotterr<-.blotter
+#   
+#   return(testPack)
+#   
+# }	# Loop i
+#   gc(verbose=verbose)
+#   
+#   
+#   for (k in 1: nrow(paramTable)){
+#     testPackListPRLStructure$statsTable<-rbind(testPackListPRLStructure$stats,cbind(testPackListPRL[[k]]$parameters,testPackListPRL[[k]]$stats))
+#     if(verbose >=1) print(names(testPackListPRL[[k]]$blotterl))
+#     
+#     for(nn in 1:length(testPackListPRL[[k]]$blotterl)){
+#       #			if(verbose >=1) print(paste(names(testPackListPRL[[k]]$blotterl)[nn],'nnp',nn,sep='.'))
+#       assign(names(testPackListPRL[[k]]$blotterl[nn]),testPackListPRL[[k]]$blotterl[[nn]],envir=as.environment(.blotter))
+#     }
+#     names(testPackListPRL)[k]<-testPackListPRL[[k]]$portfolio.st
+#   }
+#   
+#   
+#   testPackListPRLStructure$eachRun<-testPackListPRL
+#   testPackListPRLStructure$paramTable<-paramTable
+#   testPackListPRLStructure$paramConstrainTable<-data.frame(parameterConstraints)
+#   
+#   testPackListPRLStructure$parameterDistribution<-parameterPool
+#   testPackListPRLStructure$parameterConstraints<-parameterConstraints
+#   
+#   return(testPackListPRLStructure)
+#   
+# }
+# 
+# assignInNamespace("applyParameter", applyParameter, ns="quantstrat")
+# 
+# # this function should not be edited, it is just called by applyParameter 
+# paramConstraint <- function(label,data=mktdata, columns, relationship=c("gt","lt","eq","gte","lte")) {
+#   relationship=relationship[1] #only use the first one
+#   #	if(verbose >=1) print(columns)
+#   if (length(columns)==2){
+#     ret_sig=NULL
+#     if (relationship=='op'){
+#       # (How) can this support "Close"? --jmu
+#       if(columns[1] %in% c("Close","Cl","close"))
+#         stop("Close not supported with relationship=='op'")
+#       switch(columns[1],
+#              Low =, 
+#              low =, 
+#              bid = { relationship = 'lt' },
+#              Hi  =,
+#              High=,
+#              high=,
+#              ask = {relationship = 'gt'}
+#       )
+#     }
+#     
+#     colNums <- match.names(columns,colnames(data))
+#     
+#     opr <- switch( relationship,
+#                    gt = , '>' = '>', 
+#                    lt =, '<' = '<', 
+#                    eq =, "==" =, "=" = "==",
+#                    gte =, gteq =, ge =, ">=" = ">=",
+#                    lte =, lteq =, le =, "<=" = "<="
+#     )
+#     
+#     ret_sig$tname <- do.call( opr, list(data[,colNums[1]], data[,colNums[2]]))
+#     
+#   } else {
+#     stop("comparison of more than two columns not supported, see sigFormula")
+#   }
+#   names(ret_sig)<-label
+#   return(data.frame(ret_sig))
+# }
+# 
+# assignInNamespace("paramConstraint", paramConstraint, ns="quantstrat")

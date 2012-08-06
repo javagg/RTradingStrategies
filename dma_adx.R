@@ -4,6 +4,7 @@ source(file.path(current.dir, "quantstrat-myrule.R"))
 
 require(quantstrat)
 require(qmao)
+require(foreach)
 require(PerformanceAnalytics)
 
 options(width=240)
@@ -12,7 +13,7 @@ options(width=240)
 # Parameters
 ###############################################################################
 fastEMA <- 20 
-slowEMA <- 50
+slowEMA <- 60
 adx.min <- 12
 adx.max <- 58
 stoplimit.threshold <- -0.4
@@ -32,10 +33,6 @@ osOp <- function (timestamp, orderqty, portfolio, symbol, ruletype, ...) {
   }
   return(orderqty)
 }
-
-# myOrderProc <- function(portfolio, symbol, mktdata, timespan = NULL, ordertype = NULL, ..., slippageFUN = NULL)) {
-#   
-# }
 
 ABC <- function(x) {
   return(cbind(As(x), Bi(x), Cl(x)))
@@ -75,108 +72,137 @@ sigMarketClose <- function(label, data = mktdata, timespan) {
   return(signal)
 }
 
-trade <- function(symbol, day) {
-  strategy.name <- "dma_adx"
-  portfolio.name <- strategy.name
-  account.name <- strategy.name
+init.strat <- function() {
   
-  # clear out evironment
-  try(rm(list=ls(pos=.blotter), pos=.blotter), silent=T)
-  try(rm(list=ls(pos=.strategy), pos=.strategy), silent=T)
-  try(rm(list=ls(pos=.instrument), pos=.instrument), silent=T)
-  
-  currency('RMB')
-  future(symbol, currency='RMB', multiplier=300)
-  
-  # getData
-  mrk.data <- get(symbol)
-  assign(symbol, mrk.data)
-  
-  initPortf(portfolio.name, symbols=symbol, initDate=start.time)
-  initAcct(account.name, portfolios=portfolio.name, initDate=start.time)
-  initOrders(portfolio=portfolio.name, initDate=start.time)
-  
-  strat <- strategy(strategy.name)
-
-  # indicators
-  strat <- add.indicator(strat, label="slow.EMA", name='EMA', arguments=list(x=quote(Cl(mktdata)), n=slowEMA))
-  strat <- add.indicator(strat, label="fast.EMA", name='EMA', arguments=list(x=quote(Cl(mktdata)), n=fastEMA))
-  strat <- add.indicator(strat, label="adx", name='ADX', arguments=list(HLC=quote(ABC(mktdata))))
-  
-  # signals
-  strat <- add.signal(strat, name="sigCrossover", arguments = list(columns=c("fast.EMA", "slow.EMA"), relationship="gte"), label="fast.cross.above.slow")
-  strat <- add.signal(strat, name="sigCrossover", arguments = list(columns=c("fast.EMA", "slow.EMA"), relationship="lt"), label="fast.cross.below.slow")
-  strat <- add.signal(strat, label="buy.long", name="sigBuyLong", arguments=list(data=quote(mktdata), adx.range=c(adx.min, adx.max)))
-  strat <- add.signal(strat, label="sell.short", name="sigSellShort", arguments=list(data=quote(mktdata), adx.range=c(adx.min, adx.max)))
-  strat <- add.signal(strat, name="sigMarketClose", arguments = list(data=quote(mktdata), timespan=exit.timespan), label="market.close") 
-  
-  # mkt <- get(symbol)
-  # mkt <- applySignals(strat, mktdata=applyIndicators(strat, mktdata=get(symbol))) #for debugging
-  # print(tail(mkt, n=30))
-  
-  # rules
-  # buy long
-  strat <- add.rule(strat, label="signal.enter", name="ruleSignal", arguments = list(sigcol="buy.long", sigval=T, orderqty=qty, ordertype='market', orderside='long', pricemethod='market', replace=F, TxnFees=txnfee), type='enter', timespan=enter.timespan)
-  strat <- add.rule(strat, label='signal.exit', name="ruleSignal", arguments = list(sigcol="fast.cross.below.slow", sigval=T, orderqty="all", ordertype='market', orderside='long', pricemethod='market', replace=F, TxnFees=txnfee, orderset="exit"), type='exit')
-  # strat <- add.rule(strat, label='stoploss.exit', name="ruleSignal", arguments = list(sigcol="buy.long", sigval=T, orderqty="all", ordertype='stoplimit', orderside='long', threshold=stoploss.threshold, tmult=T, TxnFees=txnfee, orderset="exit2"), type='risk')
-  strat <- add.rule(strat, label='stoptrailing.exit', name="ruleSignal", arguments = list(sigcol="buy.long", sigval=T, orderqty="all", ordertype='stoptrailing', orderside='long', threshold=stoptrailing.threshold, tmult=F, TxnFees=txnfee, orderset="exit2"), type='risk')
-  strat <- add.rule(strat, name="ruleSignal", arguments = list(sigcol="market.close", sigval=T, orderqty="all", ordertype='market', orderside='long'), type='risk')
-  
-  # sell short
-  strat <- add.rule(strat, label="signal.enter", name="ruleSignal", arguments = list(sigcol="sell.short", sigval=T, orderqty=-qty, ordertype='market', orderside='short', pricemethod='market', replace=F, TxnFees=txnfee), type='enter', timespan=enter.timespan)
-  strat <- add.rule(strat, label='signal.exit', name="ruleSignal", arguments = list(sigcol="fast.cross.above.slow", sigval=T, orderqty="all", ordertype='market', orderside='short', pricemethod='market', replace=F, TxnFees=txnfee, orderset="exit"), type='exit')
-  # strat <- add.rule(strat, label='stoploss.exit', name="ruleSignal", arguments = list(sigcol="sell.short", sigval=T, orderqty="all", ordertype='stoplimit', orderside='short', threshold=stoploss.threshold, tmult=T, TxnFees=txnfee, orderset="exit2"), type='risk')
-  strat <- add.rule(strat, label='stoptrailing.exit', name="ruleSignal", arguments = list(sigcol="sell.short", sigval=T, orderqty="all", ordertype='stoptrailing', orderside='short', threshold=-stoptrailing.threshold, tmult=F, TxnFees=txnfee, orderset="exit2"), type='risk')
-  strat <- add.rule(strat, name="ruleSignal", arguments = list(sigcol="market.close", sigval=T, orderqty="all", ordertype='market', orderside='short'), type='risk')
-  
-  addPosLimit(portfolio.name, symbol, timestamp=start.time, maxpos=qty, minpos=-qty)
-  
-  out <- applyStrategy(strat, portfolios=portfolio.name)
-  updatePortf(Portfolio=portfolio.name)
-  chart.Posn(Portfolio=portfolio.name)
-  
-  p <- getPortfolio(portfolio.name)
-  s <- p$symbols[[symbol]]
-  mkt <- get(symbol)
-  adx <- ADX(ABC(mkt))$ADX
-  
-  plot(add_TA(EMA(Cl(mkt), n=slowEMA), col="red"))
-  plot(add_TA(EMA(Cl(mkt), n=fastEMA), on=4, col='blue'))
-  plot(add_TA(adx))
-  plot(add_TA(xts(rep(adx.min, nrow(mkt)), order.by=index(mkt)), on=5, col="red"))
-  plot(add_TA(xts(rep(adx.max, nrow(mkt)), order.by=index(mkt)), on=5, col="red"))
-  
-  # look at the order book
-  book <- getOrderBook(portfolio.name)
-  book <- book[[strategy.name]][[symbol]]
-  #print(book)
-  dailyEqPL(portfolio.name, drop.time=F)
-  dailyTxnPL(portfolio.name, drop.time=F)
-  print(tradeStats(portfolio.name))
-  dailyStats(portfolio.name)
-  getEndEq(account.name, Date=Sys.time())
-  getPosQty(portfolio.name, Symbol=symbol, Date=Sys.time())
-
 }
 
-symbols <- c("IF1202", "IF1203", "IF1204", "IF1205", "IF1206", "IF1207", "IF1208")
-symbols <- c("IF1208")
+# trade <- function(symbol, day) {
+strategy.name <- "dma_adx"
+portfolio.name <- strategy.name
+account.name <- strategy.name
+symbol <- "IF1208"
 
-open.timespan <- "T09:15/T15:15"
-for (symbol in symbols) {
-  mkt <- get(symbol)
-  mkt <- TimeOfDaySubset(mkt, open.timespan)
-  idx <- index(mkt)
-  days <- format(unique(as.Date(idx)), format="%Y-%m-%d")
-  for (day in days) {
-    daydata <- mkt[day]
-    assign(symbol, daydata)
-    png(paste(symbol, day, "png", sep="."))
-    sink(paste(symbol, day, "txt", sep="."))
-    trade(symbol, day)
-    sink()
-    dev.off()
-  }
-  rm(symbol)
-}
+# clear out evironment
+rm.strat(strategy.name)
 
+currency('RMB')
+future(symbol, currency='RMB', multiplier=300)
+
+# getData
+# mrk.data <- get(symbol)
+# assign(symbol, mrk.data)
+
+getSymbols("IF1208", src="RData", dir=current.dir,  col.names=c("High","Low","Close","Bid", "Ask", "Volume"))
+
+initPortf(portfolio.name, symbols=symbol, initDate=start.time)
+initAcct(account.name, portfolios=portfolio.name, initDate=start.time)
+initOrders(portfolio=portfolio.name, initDate=start.time)
+
+strat <- strategy(strategy.name)
+
+# add init functions
+strat <- add.init(strat, name="init.strat", arguments=list())
+# indicators
+strat <- add.indicator(strat, label="slow.EMA", name='EMA', arguments=list(x=quote(Cl(mktdata)), n=slowEMA))
+strat <- add.indicator(strat, label="fast.EMA", name='EMA', arguments=list(x=quote(Cl(mktdata)), n=fastEMA))
+strat <- add.indicator(strat, label="adx", name='ADX', arguments=list(HLC=quote(ABC(mktdata))))
+
+# signals
+strat <- add.signal(strat, name="sigCrossover", arguments = list(columns=c("fast.EMA", "slow.EMA"), relationship="gte"), label="fast.cross.above.slow")
+strat <- add.signal(strat, name="sigCrossover", arguments = list(columns=c("fast.EMA", "slow.EMA"), relationship="lt"), label="fast.cross.below.slow")
+strat <- add.signal(strat, label="buy.long", name="sigBuyLong", arguments=list(data=quote(mktdata), adx.range=c(adx.min, adx.max)))
+strat <- add.signal(strat, label="sell.short", name="sigSellShort", arguments=list(data=quote(mktdata), adx.range=c(adx.min, adx.max)))
+strat <- add.signal(strat, name="sigMarketClose", arguments = list(data=quote(mktdata), timespan=exit.timespan), label="market.close") 
+
+# mkt <- get(symbol)
+# mkt <- applySignals(strat, mktdata=applyIndicators(strat, mktdata=get(symbol))) #for debugging
+# print(tail(mkt, n=30))
+
+# rules
+# buy long
+strat <- add.rule(strat, label="signal.enter", name="ruleSignal", arguments = list(sigcol="buy.long", sigval=T, orderqty=qty, ordertype='market', orderside='long', pricemethod='market', replace=F, TxnFees=txnfee), type='enter', timespan=enter.timespan)
+strat <- add.rule(strat, label='signal.exit', name="ruleSignal", arguments = list(sigcol="fast.cross.below.slow", sigval=T, orderqty="all", ordertype='market', orderside='long', pricemethod='market', replace=F, TxnFees=txnfee, orderset="exit"), type='exit')
+# strat <- add.rule(strat, label='stoploss.exit', name="ruleSignal", arguments = list(sigcol="buy.long", sigval=T, orderqty="all", ordertype='stoplimit', orderside='long', threshold=stoploss.threshold, tmult=T, TxnFees=txnfee, orderset="exit2"), type='risk')
+strat <- add.rule(strat, label='stoptrailing.exit', name="ruleSignal", arguments = list(sigcol="buy.long", sigval=T, orderqty="all", ordertype='stoptrailing', orderside='long', threshold=stoptrailing.threshold, tmult=F, TxnFees=txnfee, orderset="exit2"), type='risk')
+strat <- add.rule(strat, name="ruleSignal", arguments = list(sigcol="market.close", sigval=T, orderqty="all", ordertype='market', orderside='long'), type='risk')
+
+# sell short
+strat <- add.rule(strat, label="signal.enter", name="ruleSignal", arguments = list(sigcol="sell.short", sigval=T, orderqty=-qty, ordertype='market', orderside='short', pricemethod='market', replace=F, TxnFees=txnfee), type='enter', timespan=enter.timespan)
+strat <- add.rule(strat, label='signal.exit', name="ruleSignal", arguments = list(sigcol="fast.cross.above.slow", sigval=T, orderqty="all", ordertype='market', orderside='short', pricemethod='market', replace=F, TxnFees=txnfee, orderset="exit"), type='exit')
+# strat <- add.rule(strat, label='stoploss.exit', name="ruleSignal", arguments = list(sigcol="sell.short", sigval=T, orderqty="all", ordertype='stoplimit', orderside='short', threshold=stoploss.threshold, tmult=T, TxnFees=txnfee, orderset="exit2"), type='risk')
+strat <- add.rule(strat, label='stoptrailing.exit', name="ruleSignal", arguments = list(sigcol="sell.short", sigval=T, orderqty="all", ordertype='stoptrailing', orderside='short', threshold=-stoptrailing.threshold, tmult=F, TxnFees=txnfee, orderset="exit2"), type='risk')
+strat <- add.rule(strat, name="ruleSignal", arguments = list(sigcol="market.close", sigval=T, orderqty="all", ordertype='market', orderside='short'), type='risk')
+
+addPosLimit(portfolio.name, symbol, timestamp=start.time, maxpos=qty, minpos=-qty)
+
+out <- applyStrategy(strat, portfolios=portfolio.name, initStrat=F, updateStrat=F)
+# updatePortf(Portfolio=portfolio.name)
+# chart.Posn(Portfolio=portfolio.name)
+# 
+# p <- getPortfolio(portfolio.name)
+# s <- p$symbols[[symbol]]
+# mkt <- get(symbol)
+# adx <- ADX(ABC(mkt))$ADX
+# 
+# plot(add_TA(EMA(Cl(mkt), n=slowEMA), col="red"))
+# plot(add_TA(EMA(Cl(mkt), n=fastEMA), on=4, col='blue'))
+# plot(add_TA(adx))
+# plot(add_TA(xts(rep(adx.min, nrow(mkt)), order.by=index(mkt)), on=5, col="red"))
+# plot(add_TA(xts(rep(adx.max, nrow(mkt)), order.by=index(mkt)), on=5, col="red"))
+# 
+# # look at the order book
+# book <- getOrderBook(portfolio.name)
+# book <- book[[strategy.name]][[symbol]]
+# 
+# dailyEqPL(portfolio.name, drop.time=F)
+# dailyTxnPL(portfolio.name, drop.time=F)
+# print(tradeStats(portfolio.name))
+# dailyStats(portfolio.name)
+# getEndEq(account.name, Date=Sys.time())
+# getPosQty(portfolio.name, Symbol=symbol, Date=Sys.time())
+
+# 
+#   return(strat)
+# }
+# 
+# 
+# strat <- trade("IF1208")
+
+rm(pd)
+paramStructure <- getParameterTable(strat)
+
+pd <- setParameterDistribution(type='indicator', indexnum=1, distribution=list(n=(10:20)), label='fastEMA')
+pd <- setParameterDistribution(pd, type='indicator', indexnum=2, distribution=list(n=(30:40)), label='slowEMA')
+pd <- setParameterDistribution(pd, type='exit', indexnum=1, distribution=list(threshold=seq(0.01, 0.03, by=0.005)), label='exit.threshold')
+
+#pd <- setParameterDistribution(pd, type='signal', indexnum=1, distribution=list(relationship=c('gt', 'gte')), label='sig1.gtgte')
+print(pd)
+
+rm(pc)
+pc <- setParameterConstraint(constraintLabel='ma.pc', paramList=c('fastEMA', 'slowEMA'), relationship='lt')
+print(pc)
+testPackList <- applyParameter(strategy=strat, portfolios=portfolio.name, parameterPool=pd, method='random', sampleSize=2, parameterConstraints=pc)
+
+# symbols <- c("IF1203", "IF1204", "IF1205", "IF1206", "IF1207", "IF1208")
+# symbols <- c("IF1207")
+#
+# open.timespan <- "T09:15/T15:15"
+# 
+# for (symbol in symbols) {
+#   mkt <- get(symbol)
+#   mkt <- TimeOfDaySubset(mkt, open.timespan)
+#   idx <- index(mkt)
+#   days <- format(unique(as.Date(idx)), format="%Y-%m-%d")
+#   for (day in days) {
+#     daydata <- mkt[day]
+#     assign(symbol, daydata)
+#     png(paste(symbol, day, "png", sep="."))
+#     sink(paste(symbol, day, "txt", sep="."))
+#     trade(symbol, day)
+#     sink()
+#     dev.off()
+#   }
+#   rm(symbol)
+# }
+# 
+# sink()

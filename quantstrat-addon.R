@@ -47,7 +47,7 @@ convert.time.series <- function (fr, return.class) {
   }
 }
 
-getSymbols.mysql <- function (Symbols, env, return.class = "xts", db.fields = c("date", "o", "h", "l", "c", "v", "a"), 
+getSymbols.mysql <- function(Symbols, env, return.class = "xts", db.fields = c("date", "o", "h", "l", "c", "v", "a"), 
     field.names = NULL, user = NULL, password = NULL, dbname = NULL, ...) {
   
   importDefaults("getSymbols.MySQL")
