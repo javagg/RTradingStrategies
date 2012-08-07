@@ -87,6 +87,7 @@ getSymbols.mysql <- function(Symbols, env, return.class = "xts", db.fields = c("
     query <- paste("SELECT ", paste(db.fields, collapse = ","), " FROM ", Symbols[[i]], " ORDER BY date")
     rs <- dbSendQuery(con, query)
     fr <- fetch(rs, n = -1)
+#     print(head(fr))
     fr <- xts(as.matrix(fr[, -1]), order.by = as.POSIXct(fr[, 1], origin = "1970-01-01"), src = dbname, updated = Sys.time())
     #colnames(fr) <- paste(Symbols[[i]], c("Open", "High", "Low", "Close", "Volume", "Adjusted"), sep = ".")
     colnames(fr) <- field.names
@@ -105,10 +106,10 @@ getSymbols.mysql <- function(Symbols, env, return.class = "xts", db.fields = c("
 
 getSymbols.MySQL <- getSymbols.mysql
 
-# assignInNamespace("getSymbols.MySQL", getSymbols.MySQL, ns="quantmod")
-# assignInNamespace("getSymbols.mysql", getSymbols.MySQL, ns="quantmod")
-# rm(getSymbols.MySQL)
-# rm(getSymbols.mysql)
+assignInNamespace("getSymbols.MySQL", getSymbols.MySQL, ns="quantmod")
+assignInNamespace("getSymbols.mysql", getSymbols.MySQL, ns="quantmod")
+rm(getSymbols.MySQL)
+rm(getSymbols.mysql)
 
 # These functions should be included into the 'xts' package
 to.seconds <- function(x, k, name, ...) {

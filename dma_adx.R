@@ -80,19 +80,19 @@ init.strat <- function() {
 strategy.name <- "dma_adx"
 portfolio.name <- strategy.name
 account.name <- strategy.name
-symbol <- "IF1208"
+symbol <- "IF1204"
 
 # clear out evironment
 rm.strat(strategy.name)
 
-currency('RMB')
+currency('USD','RMB')
 future(symbol, currency='RMB', multiplier=300)
 
 # getData
 # mrk.data <- get(symbol)
 # assign(symbol, mrk.data)
 
-getSymbols("IF1208", src="RData", dir=current.dir,  col.names=c("High","Low","Close","Bid", "Ask", "Volume"))
+getSymbols("IF1204", src="RData", dir=current.dir,  col.names=c("High","Low","Close","Bid", "Ask", "Volume"))
 
 initPortf(portfolio.name, symbols=symbol, initDate=start.time)
 initAcct(account.name, portfolios=portfolio.name, initDate=start.time)

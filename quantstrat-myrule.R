@@ -382,7 +382,7 @@ applyRules <- function(portfolio, symbol, strategy, mktdata, Dates=NULL, indicat
               peak.index <- c(rep(F, peak.i-1), T, rep(NA,length(drawdown)-peak.i))
               drawdown <- cbind(drawdown, mkt_price_series, orderThreshold, cross, last.peak.price, peak.index)
               colnames(drawdown) <- c("drawdown", "mkt.price", "threshold", "cross", "last.peak.price","peak.index")
-              ddrawdown <<- drawdown
+#               ddrawdown <<- drawdown
               
 #               print(timestamp)
 #               print("addddddddd")
