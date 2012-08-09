@@ -198,4 +198,4 @@ pd <- setParameterDistribution(pd, type='indicator', indexnum=2, distribution=li
 #pd <- setParameterDistribution(pd, type='signal', indexnum=1, distribution=list(relationship=c('gt', 'gte')), label='sig1.gtgte')
 
 pc <- setParameterConstraint(constraintLabel='ma.pc', paramList=c('fastEMA', 'slowEMA'), relationship='lt')
-testPackList <- applyParameter(strategy=strat, portfolios=portfolio.name, parameterPool=pd, method='random', sampleSize=10, parameterConstraints=pc, verbose=T)
+testPackList <- applyParameter(strategy=strat, portfolios=portfolio.name, parameterPool=pd, method='expand', sampleSize=10, parameterConstraints=pc, verbose=T)
