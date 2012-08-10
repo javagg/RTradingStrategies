@@ -108,7 +108,7 @@ init.strat <- function() {
 strategy.name <- "dma_adx"
 portfolio.name <- strategy.name
 account.name <- strategy.name
-symbol <- "IF1208"
+symbol <- "IF1204"
 
 # clear out evironment
 rm.strat(strategy.name)
@@ -191,11 +191,13 @@ addPosLimit(portfolio.name, symbol, timestamp=start.time, maxpos=qty, minpos=-qt
 
 #print(getParameterTable(strat))
 rm(pd, pc)
-pd <- setParameterDistribution(type='indicator', indexnum=1, distribution=list(n=(10:20)), label='fastEMA')
-pd <- setParameterDistribution(pd, type='indicator', indexnum=2, distribution=list(n=(30:40)), label='slowEMA')
+pd <- setParameterDistribution(type='indicator', indexnum=1, distribution=list(n=(9:10)), label='fastEMA')
+pd <- setParameterDistribution(pd, type='indicator', indexnum=2, distribution=list(n=(40:41)), label='slowEMA')
 #pd <- setParameterDistribution(pd, type='exit', indexnum=1, distribution=list(threshold=seq(0.01, 0.03, by=0.005)), label='exit.threshold')
 
 #pd <- setParameterDistribution(pd, type='signal', indexnum=1, distribution=list(relationship=c('gt', 'gte')), label='sig1.gtgte')
 
 pc <- setParameterConstraint(constraintLabel='ma.pc', paramList=c('fastEMA', 'slowEMA'), relationship='lt')
 testPackList <- applyParameter(strategy=strat, portfolios=portfolio.name, parameterPool=pd, method='expand', sampleSize=10, parameterConstraints=pc, verbose=T)
+
+testPackList$eachRun
