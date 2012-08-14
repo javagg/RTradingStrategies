@@ -263,8 +263,12 @@ getSymbols.myfile <- function(Symbols, env) {
   }
   
   if(.parseISO8601(Dates)$first.time < as.POSIXct(first(index(prices))) || is.na(.parseISO8601(Dates)$first.time)){
-    last.time<-last(Dates)
-    Dates <- index(prices[paste('/',last.time,sep='')])
+    #################################################
+    # edit by alex lee
+    #################################################
+    last.time <- .parseISO8601(Dates)$last.time
+    if (is.na(last.time)) last.time=NULL
+    Dates <- index(prices[paste('/', last.time, sep='')])
   }
   
   if(ncol(prices)>1) prices=getPrice(Prices,Symbol)
@@ -306,7 +310,6 @@ getSymbols.myfile <- function(Symbols, env) {
   
   #	 line up transaction with Dates list
   tmpPL <- merge(Txns, priorPL, Prices) # most Txn columns will get discarded later, as will the rows from 'before' the startDate
-  
   #browser()
   
   if(is.na(tmpPL$Prices[1])){
