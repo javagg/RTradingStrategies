@@ -108,7 +108,7 @@ init.strat <- function() {
 strategy.name <- "dma_adx"
 portfolio.name <- strategy.name
 account.name <- strategy.name
-symbol <- "IF1204"
+symbol <- "IF1201"
 
 # clear out evironment
 rm.strat(strategy.name)

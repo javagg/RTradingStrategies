@@ -451,4 +451,3 @@ getSymbols.myfile <- function(Symbols, env) {
 }
 
 assignInNamespace(".updatePosPL", .updatePosPL, ns="blotter")
-
