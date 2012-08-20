@@ -17,7 +17,7 @@ stock.str='MSFT' # what are we trying it on
 currency('USD')
 stock(stock.str,currency='USD',multiplier=1)
 initDate='2009-11-30'
-toDate="2011-08-30"
+toDate="2012-08-30"
 initEq=1000000
 
 portfolio.st='macross'

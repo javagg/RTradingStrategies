@@ -108,13 +108,14 @@ init.strat <- function() {
 strategy.name <- "dma_adx"
 portfolio.name <- strategy.name
 account.name <- strategy.name
-symbol <- "IF1201"
+symbol <- "IF1205"
 
 # clear out evironment
 rm.strat(strategy.name)
 
 currency('RMB')
 currency('USD')
+
 future(symbol, currency='RMB', multiplier=300)
 
 getSymbols(symbol, src="RData", dir=current.dir,  col.names=c("High","Low","Close","Bid", "Ask", "Volume"))
@@ -163,41 +164,41 @@ strat <- add.rule(strat, name="ruleSignal", arguments = list(sigcol="market.clos
 
 addPosLimit(portfolio.name, symbol, timestamp=start.time, maxpos=qty, minpos=-qty)
 
-# out <- applyStrategy(strat, portfolios=portfolio.name, initStrat=F, updateStrat=F)
-# updatePortf(Portfolio=portfolio.name)
-# # plot results
-# chart.Posn(Portfolio=portfolio.name)
-# p <- getPortfolio(portfolio.name)
-# s <- p$symbols[[symbol]]
-# mkt <- get(symbol)
-# adx <- ADX(ABC(mkt))$ADX
-# plot(add_TA(EMA(Cl(mkt), n=slowEMA), col="red"))
-# plot(add_TA(EMA(Cl(mkt), n=fastEMA), on=4, col='blue'))
-# plot(add_TA(adx))
-# plot(add_TA(xts(rep(adx.min, nrow(mkt)), order.by=index(mkt)), on=5, col="red"))
-# plot(add_TA(xts(rep(adx.max, nrow(mkt)), order.by=index(mkt)), on=5, col="red"))
+out <- applyStrategy(strat, portfolios=portfolio.name, initStrat=F, updateStrat=F)
+updatePortf(Portfolio=portfolio.name)
+# plot results
+chart.Posn(Portfolio=portfolio.name)
+p <- getPortfolio(portfolio.name)
+s <- p$symbols[[symbol]]
+mkt <- get(symbol)
+adx <- ADX(ABC(mkt))$ADX
+plot(add_TA(EMA(Cl(mkt), n=slowEMA), col="red"))
+plot(add_TA(EMA(Cl(mkt), n=fastEMA), on=4, col='blue'))
+plot(add_TA(adx))
+plot(add_TA(xts(rep(adx.min, nrow(mkt)), order.by=index(mkt)), on=5, col="red"))
+plot(add_TA(xts(rep(adx.max, nrow(mkt)), order.by=index(mkt)), on=5, col="red"))
+
+# look at the order book
+book <- getOrderBook(portfolio.name)
+book <- book[[strategy.name]][[symbol]]
+
+dailyEqPL(portfolio.name, drop.time=F)
+dailyTxnPL(portfolio.name, drop.time=F)
+print(tradeStats(portfolio.name))
+dailyStats(portfolio.name)
+getEndEq(account.name, Date=Sys.time())
+getPosQty(portfolio.name, Symbol=symbol, Date=Sys.time())
+
+
+# #print(getParameterTable(strat))
+# rm(pd, pc)
+# pd <- setParameterDistribution(type='indicator', indexnum=1, distribution=list(n=(9:10)), label='fastEMA')
+# pd <- setParameterDistribution(pd, type='indicator', indexnum=2, distribution=list(n=(40:41)), label='slowEMA')
+# #pd <- setParameterDistribution(pd, type='exit', indexnum=1, distribution=list(threshold=seq(0.01, 0.03, by=0.005)), label='exit.threshold')
 # 
-# # look at the order book
-# book <- getOrderBook(portfolio.name)
-# book <- book[[strategy.name]][[symbol]]
+# #pd <- setParameterDistribution(pd, type='signal', indexnum=1, distribution=list(relationship=c('gt', 'gte')), label='sig1.gtgte')
 # 
-# dailyEqPL(portfolio.name, drop.time=F)
-# dailyTxnPL(portfolio.name, drop.time=F)
-# print(tradeStats(portfolio.name))
-# dailyStats(portfolio.name)
-# getEndEq(account.name, Date=Sys.time())
-# getPosQty(portfolio.name, Symbol=symbol, Date=Sys.time())
-
-
-#print(getParameterTable(strat))
-rm(pd, pc)
-pd <- setParameterDistribution(type='indicator', indexnum=1, distribution=list(n=(9:10)), label='fastEMA')
-pd <- setParameterDistribution(pd, type='indicator', indexnum=2, distribution=list(n=(40:41)), label='slowEMA')
-#pd <- setParameterDistribution(pd, type='exit', indexnum=1, distribution=list(threshold=seq(0.01, 0.03, by=0.005)), label='exit.threshold')
-
-#pd <- setParameterDistribution(pd, type='signal', indexnum=1, distribution=list(relationship=c('gt', 'gte')), label='sig1.gtgte')
-
-pc <- setParameterConstraint(constraintLabel='ma.pc', paramList=c('fastEMA', 'slowEMA'), relationship='lt')
-testPackList <- applyParameter(strategy=strat, portfolios=portfolio.name, parameterPool=pd, method='expand', sampleSize=10, parameterConstraints=pc, verbose=T)
-
-testPackList$eachRun
+# pc <- setParameterConstraint(constraintLabel='ma.pc', paramList=c('fastEMA', 'slowEMA'), relationship='lt')
+# testPackList <- applyParameter(strategy=strat, portfolios=portfolio.name, parameterPool=pd, method='expand', sampleSize=10, parameterConstraints=pc, verbose=T)
+# 
+# testPackList$eachRun
